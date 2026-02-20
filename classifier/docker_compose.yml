@@ -1,0 +1,41 @@
+services:
+  db:
+    image: postgres:18-alpine
+    container_name: postgres_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-classifier}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-secret}
+      POSTGRES_DB: ${DB_NAME:-classifier}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./sql/schema.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - classifier_net
+
+  app:
+    build: .
+    container_name: classifier_app
+    restart: unless-stopped
+    depends-on:
+      - db
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-classifier}
+      DB_PASSWORD: ${DB_PASSWORD:-secret}
+      DB_NAME: ${DB_NAME:-classifier}
+    stdin_open: true
+    tty: true
+    networks:
+      - classifier_net
+
+volumes:
+  pg_data:
+
+networks:
+  classifier_net:
+    driver: bridge
+    
