@@ -438,7 +438,7 @@ func (r *PostgresRepository) DeleteUnit(ctx context.Context, id int) error {
 	QueryToCheck := `
 		SELECT COUNT(*) 
 		FROM classifier_nodes 
-		WHERE unit_id = $1
+		WHERE unit_id = $1;
 	`
 	err := r.db.QueryRowContext(ctx, QueryToCheck, id).Scan(&count)
 	if err != nil {
@@ -447,7 +447,12 @@ func (r *PostgresRepository) DeleteUnit(ctx context.Context, id int) error {
 	if count > 0 {
 		return errors.New("unit is used by nodes")
 	}
-	result, err := r.db.ExecContext(ctx, `DELETE FROM units WHERE id = $1`, id)
+	QueryToDelete := `
+		DELETE 
+		FROM units 
+		WHERE id = $1;
+	`
+	result, err := r.db.ExecContext(ctx, QueryToDelete, id)
 	if err != nil {
 		return err
 	}
@@ -537,8 +542,8 @@ func (r *PostgresRepository) getMaxSortOrder(ctx context.Context, parentID int) 
 	query := `
 		SELECT MAX(sort_order) 
 		FROM classifier_nodes 
-		WHERE parent_id = $1
-		`
+		WHERE parent_id = $1;
+	`
 	err := r.db.QueryRowContext(ctx, query, parentID).Scan(&max)
 	if err != nil {
 		return 0, err
