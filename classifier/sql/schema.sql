@@ -23,6 +23,8 @@ INSERT INTO classifier_nodes (id, name, parent_id, node_type, is_terminal, unit_
 VALUES (1, 'Trash', NULL, 'metaclass', false, NULL, 0)
 ON CONFLICT (id) DO NOTHING;
 
+SELECT setval('classifier_nodes_id_seq', COALESCE((SELECT MAX(id) FROM classifier_nodes), 0));
+
 INSERT INTO units (name, multiplier) VALUES
     ('метр', 1.0),
     ('миллиметр', 0.001),
