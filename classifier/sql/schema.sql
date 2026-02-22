@@ -1,4 +1,3 @@
--- Таблица единиц измерения
 CREATE TABLE IF NOT EXISTS units (
     id          SERIAL PRIMARY KEY,
     name        TEXT NOT NULL,

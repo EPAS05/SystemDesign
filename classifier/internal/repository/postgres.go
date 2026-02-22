@@ -144,6 +144,7 @@ func (r *PostgresRepository) GetAllDescendants(ctx context.Context, id int) ([]*
 		)
 		SELECT id, name, parent_id, node_type, is_terminal, unit_id, sort_order, created_at, updated_at
 		FROM descendants
+		ORDER BY sort_order, name
 	`
 	rows, err := r.db.QueryContext(ctx, query, id)
 	if err != nil {
@@ -465,9 +466,9 @@ func (r *PostgresRepository) DeleteUnit(ctx context.Context, id int) error {
 
 func (r *PostgresRepository) getNodeByID(ctx context.Context, id int) (*models.Node, error) {
 	query := `
-		SELECT id, name, parent_id, node_type, is_terminal, created_at, updated_at
-        FROM classifier_nodes
-        WHERE id = $1;
+		SELECT id, name, parent_id, node_type, is_terminal, unit_id, sort_order, created_at, updated_at
+		FROM classifier_nodes
+		WHERE id = $1;
 	`
 
 	var node models.Node
@@ -477,6 +478,8 @@ func (r *PostgresRepository) getNodeByID(ctx context.Context, id int) (*models.N
 		&node.ParentID,
 		&node.NodeType,
 		&node.IsTerminal,
+		&node.UnitID,
+		&node.SortOrder,
 		&node.CreatedAt,
 		&node.UpdatedAt,
 	)

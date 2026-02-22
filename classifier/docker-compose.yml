@@ -19,7 +19,7 @@ services:
     build: .
     container_name: classifier_app
     restart: unless-stopped
-    depends-on:
+    depends_on:
       - db
     environment:
       DB_HOST: db
