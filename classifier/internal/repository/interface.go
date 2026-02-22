@@ -11,6 +11,7 @@ type Repository interface {
 	GetChildren(ctx context.Context, id int) ([]*models.Node, error)
 	GetParent(ctx context.Context, id int) (*models.Node, error)
 	GetAllDescendants(ctx context.Context, id int) ([]*models.Node, error)
+	GetAllTerminalDescendants(ctx context.Context, nodeID int) ([]*models.Node, error)
 	GetAllAncestors(ctx context.Context, id int) ([]*models.Node, error)
 	SetParent(ctx context.Context, req models.SetParentRequest) error
 	SetName(ctx context.Context, req models.SetNameRequest) error

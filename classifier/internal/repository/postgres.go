@@ -173,6 +173,49 @@ func (r *PostgresRepository) GetAllDescendants(ctx context.Context, id int) ([]*
 	return nodes, rows.Err()
 }
 
+func (r *PostgresRepository) GetAllTerminalDescendants(ctx context.Context, nodeID int) ([]*models.Node, error) {
+	query := `
+		WITH RECURSIVE descendants AS (
+			SELECT id, name, parent_id, node_type, is_terminal, unit_id, sort_order, created_at, updated_at
+			FROM classifier_nodes
+			WHERE parent_id = $1
+			UNION ALL
+			SELECT n.id, n.name, n.parent_id, n.node_type, n.is_terminal, n.unit_id, n.sort_order, n.created_at, n.updated_at
+			FROM classifier_nodes n
+			INNER JOIN descendants d ON n.parent_id = d.id
+		)
+		SELECT id, name, parent_id, node_type, is_terminal, unit_id, sort_order, created_at, updated_at
+		FROM descendants
+		WHERE node_type = 'metaclass' AND is_terminal = true
+		ORDER BY sort_order, name
+	`
+	rows, err := r.db.QueryContext(ctx, query, nodeID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var nodes []*models.Node
+	for rows.Next() {
+		var n models.Node
+		if err := rows.Scan(
+			&n.ID,
+			&n.Name,
+			&n.ParentID,
+			&n.NodeType,
+			&n.IsTerminal,
+			&n.UnitID,
+			&n.SortOrder,
+			&n.CreatedAt,
+			&n.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		nodes = append(nodes, &n)
+	}
+	return nodes, rows.Err()
+}
+
 func (r *PostgresRepository) GetAllAncestors(ctx context.Context, id int) ([]*models.Node, error) {
 	query := `
 		WITH RECURSIVE ancestors AS (

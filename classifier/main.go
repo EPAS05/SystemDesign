@@ -60,7 +60,8 @@ func nodeMenu(repo repository.Repository, reader *bufio.Reader) {
 		fmt.Println("8. Поменять имя узла")
 		fmt.Println("9. Изменить порядок вывода")
 		fmt.Println("10. Удалить узел")
-		fmt.Println("11. Главное меню")
+		fmt.Println("11. Показать все терминальные метаклассы поддерева")
+		fmt.Println("12. Главное меню")
 		fmt.Print("Выбор: ")
 
 		choice := readLine(reader)
@@ -89,6 +90,8 @@ func nodeMenu(repo repository.Repository, reader *bufio.Reader) {
 		case "10":
 			deleteNode(ctx, repo, reader)
 		case "11":
+			showAllTerminalDesc(ctx, repo, reader)
+		case "12":
 			return
 		default:
 			fmt.Println("Неправильный выбор. Попробуйте снова")
@@ -387,6 +390,26 @@ func deleteNode(ctx context.Context, repo repository.Repository, reader *bufio.R
 		return
 	}
 	fmt.Println("Узел удален.")
+}
+
+func showAllTerminalDesc(ctx context.Context, repo repository.Repository, reader *bufio.Reader) {
+	id := readNodeID(reader)
+	if id == nil {
+		return
+	}
+	terminals, err := repo.GetAllTerminalDescendants(ctx, *id)
+	if err != nil {
+		fmt.Printf("Ошибка: %v\n", err)
+		return
+	}
+	if len(terminals) == 0 {
+		fmt.Println("Нет терминальных метаклассов в поддереве.")
+		return
+	}
+	fmt.Println("Терминальные метаклассы:")
+	for _, node := range terminals {
+		printNode(node)
+	}
 }
 
 func createUnit(ctx context.Context, repo repository.Repository, reader *bufio.Reader) {
