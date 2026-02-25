@@ -30,6 +30,7 @@ func NewPostgresRepository(db *sql.DB) *PostgresRepository {
 func (r *PostgresRepository) CreateNode(ctx context.Context, req models.CreateNodeRequest) (*models.Node, error) {
 	var parent *models.Node
 	var unitID *int
+	needUpdateParent := false
 
 	if req.ParentID != nil {
 		var err error
@@ -42,6 +43,9 @@ func (r *PostgresRepository) CreateNode(ctx context.Context, req models.CreateNo
 		}
 		if err := r.checkChildCompatibility(parent, req.NodeType); err != nil {
 			return nil, err
+		}
+		if parent.IsTerminal == nil {
+			needUpdateParent = true
 		}
 	}
 
@@ -63,6 +67,7 @@ func (r *PostgresRepository) CreateNode(ctx context.Context, req models.CreateNo
 	}
 
 	var node models.Node
+	var newIsTerminal interface{} = nil
 
 	query := `
 		INSERT INTO classifier_nodes (name, parent_id, node_type, is_terminal, unit_id, sort_order)
@@ -73,7 +78,7 @@ func (r *PostgresRepository) CreateNode(ctx context.Context, req models.CreateNo
 		req.Name,
 		req.ParentID,
 		req.NodeType,
-		req.IsTerminal,
+		newIsTerminal,
 		unitID,
 		sortOrder,
 	).Scan(
@@ -90,6 +95,19 @@ func (r *PostgresRepository) CreateNode(ctx context.Context, req models.CreateNo
 	if err != nil {
 		return nil, err
 	}
+
+	if needUpdateParent {
+		newParentTerminal := req.NodeType == models.TypeLeaf
+		queryToUpdate := `
+			UPDATE classifier_nodes SET is_terminal = $1 WHERE id = $2
+		`
+		_, err = r.db.ExecContext(ctx, queryToUpdate, newParentTerminal, *req.ParentID)
+		if err != nil {
+			return nil, errors.New("failed to update parent is_terminal: %w")
+		}
+
+	}
+
 	return &node, nil
 }
 
@@ -345,45 +363,91 @@ func (r *PostgresRepository) DeleteNode(ctx context.Context, id int) error {
 		return ErrCannotDeleteTrash
 	}
 
-	node, err := r.getNodeByID(ctx, id)
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	selectNodeQuery := `
+		SELECT id, parent_id, node_type
+		FROM classifier_nodes
+		WHERE id = $1 FOR UPDATE
+	`
+	var node models.Node
+	err = tx.QueryRowContext(ctx, selectNodeQuery, id).Scan(&node.ID, &node.ParentID, &node.NodeType)
+	if err == sql.ErrNoRows {
+		return ErrNotFound
+	}
 	if err != nil {
 		return err
 	}
 
-	queryToMove := `
-		UPDATE classifier_nodes 
-		SET parent_id = $1, updated_at = now() 
-		WHERE id = $2;
-	`
+	parentID := node.ParentID
 
 	if node.NodeType == models.TypeMetaclass {
-		children, err := r.GetChildren(ctx, id)
+		selectChildrenQuery := `
+			SELECT id FROM classifier_nodes
+			WHERE parent_id = $1 FOR UPDATE
+		`
+		rows, err := tx.QueryContext(ctx, selectChildrenQuery, id)
 		if err != nil {
 			return err
 		}
-		if len(children) > 0 {
-			for _, child := range children {
-				_, err := r.db.ExecContext(ctx, queryToMove, trashNodeID, child.ID)
-				if err != nil {
-					return errors.New("failed to move child to trash")
-				}
+		var childrenIDs []int
+		for rows.Next() {
+			var childID int
+			if err := rows.Scan(&childID); err != nil {
+				rows.Close()
+				return err
+			}
+			childrenIDs = append(childrenIDs, childID)
+		}
+		rows.Close()
+		if err = rows.Err(); err != nil {
+			return err
+		}
+
+		moveChildQuery := `
+			UPDATE classifier_nodes 
+			SET parent_id = $1, updated_at = now() 
+			WHERE id = $2
+		`
+		for _, childID := range childrenIDs {
+			_, err = tx.ExecContext(ctx, moveChildQuery, trashNodeID, childID)
+			if err != nil {
+				return errors.New("failed to move child %d to trash: %w")
 			}
 		}
 	}
 
-	queryToDelete := `
-		DELETE FROM classifier_nodes 
-		WHERE id = $1;
-	`
-	result, err := r.db.ExecContext(ctx, queryToDelete, id)
+	deleteNodeQuery := `DELETE FROM classifier_nodes WHERE id = $1`
+	result, err := tx.ExecContext(ctx, deleteNodeQuery, id)
 	if err != nil {
 		return err
 	}
-	rows, _ := result.RowsAffected()
-	if rows == 0 {
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
 		return ErrNotFound
 	}
-	return nil
+
+	if parentID != nil {
+		countChildrenQuery := `SELECT COUNT(*) FROM classifier_nodes WHERE parent_id = $1`
+		var childCount int
+		err = tx.QueryRowContext(ctx, countChildrenQuery, *parentID).Scan(&childCount)
+		if err != nil {
+			return err
+		}
+		if childCount == 0 {
+			resetParentTerminalQuery := `UPDATE classifier_nodes SET is_terminal = NULL WHERE id = $1`
+			_, err = tx.ExecContext(ctx, resetParentTerminalQuery, *parentID)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return tx.Commit()
 }
 
 func (r *PostgresRepository) CreateUnit(ctx context.Context, req models.CreateUnitRequest) (*models.Unit, error) {
@@ -541,7 +605,7 @@ func (r *PostgresRepository) checkChildCompatibility(parent *models.Node, childT
 	}
 
 	if parent.IsTerminal == nil {
-		return errors.New("error getting parent")
+		return nil
 	}
 
 	if *parent.IsTerminal {

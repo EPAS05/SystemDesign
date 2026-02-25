@@ -141,8 +141,8 @@ func createNode(ctx context.Context, repo repository.Repository, reader *bufio.R
 	typeStr := readLine(reader)
 	nodeType := models.NodeType(typeStr)
 
-	var isTerminal *bool
-	if nodeType == models.TypeMetaclass {
+	var isTerminal *bool = nil
+	/* if nodeType == models.TypeMetaclass {
 		fmt.Print("Терминальный? (true/false): ")
 		termStr := readLine(reader)
 		term, err := strconv.ParseBool(termStr)
@@ -151,7 +151,7 @@ func createNode(ctx context.Context, repo repository.Repository, reader *bufio.R
 			return
 		}
 		isTerminal = &term
-	}
+	} */
 
 	fmt.Print("ID родителя (Оставьте пустым для корня): ")
 	parentStr := readLine(reader)
