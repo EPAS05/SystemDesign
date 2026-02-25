@@ -111,7 +111,7 @@ func unitMenu(repo repository.Repository, reader *bufio.Reader) {
 		fmt.Print("Выбор: ")
 
 		choice := readLine(reader)
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
 		defer cancel()
 
 		switch choice {
@@ -141,7 +141,7 @@ func createNode(ctx context.Context, repo repository.Repository, reader *bufio.R
 	typeStr := readLine(reader)
 	nodeType := models.NodeType(typeStr)
 
-	var isTerminal *bool = nil
+	var isTerminal *bool
 	/* if nodeType == models.TypeMetaclass {
 		fmt.Print("Терминальный? (true/false): ")
 		termStr := readLine(reader)
@@ -199,13 +199,63 @@ func createNode(ctx context.Context, repo repository.Repository, reader *bufio.R
 		sortOrder = &order
 	}
 
+	var unitType *string
+	var weightPerMeter *float64
+	var pieceLength *float64
+	var defaultUnitID *int
+
+	if nodeType == models.TypeLeaf {
+
+		fmt.Print("Тип единицы (mass/length/piece): ")
+		ut := strings.ToLower(readLine(reader))
+		if ut == "mass" || ut == "length" || ut == "piece" {
+			unitType = &ut
+		} else {
+			fmt.Println("Неверный тип, оставляем пустым.")
+		}
+		fmt.Print("Вес погонного метра (т/м): ")
+		wStr := readLine(reader)
+		if wStr != "" {
+			w, err := strconv.ParseFloat(wStr, 64)
+			if err == nil {
+				weightPerMeter = &w
+			} else {
+				fmt.Println("Неверное число, оставляем пустым.")
+			}
+		}
+		fmt.Print("Длина одной штуки (м): ")
+		pStr := readLine(reader)
+		if pStr != "" {
+			p, err := strconv.ParseFloat(pStr, 64)
+			if err == nil {
+				pieceLength = &p
+			} else {
+				fmt.Println("Неверное число, оставляем пустым.")
+			}
+		}
+		fmt.Print("ID единицы измерения по умолчанию (оставьте пустым, если не задана): ")
+		defStr := readLine(reader)
+		if defStr != "" {
+			defID, err := strconv.Atoi(defStr)
+			if err == nil {
+				defaultUnitID = &defID
+			} else {
+				fmt.Println("Неверный ID, оставляем пустым.")
+			}
+		}
+	}
+
 	req := models.CreateNodeRequest{
-		Name:       name,
-		ParentID:   parentID,
-		NodeType:   nodeType,
-		IsTerminal: isTerminal,
-		UnitID:     unitID,
-		SortOrder:  sortOrder,
+		Name:           name,
+		ParentID:       parentID,
+		NodeType:       nodeType,
+		IsTerminal:     isTerminal,
+		UnitID:         unitID,
+		SortOrder:      sortOrder,
+		UnitType:       unitType,
+		WeightPerMeter: weightPerMeter,
+		PieceLength:    pieceLength,
+		DefaultUnitID:  defaultUnitID,
 	}
 
 	node, err := repo.CreateNode(ctx, req)
@@ -545,8 +595,21 @@ func printNode(node *models.Node) {
 	if node.UnitID != nil {
 		unit = fmt.Sprintf(", ID ЕИ: %d", *node.UnitID)
 	}
-	fmt.Printf("ID: %d, название: %s, тип: %s%s%s, порядок: %d\n",
-		node.ID, node.Name, node.NodeType, term, unit, node.SortOrder)
+	rolled := ""
+	if node.UnitType != nil {
+		rolled = fmt.Sprintf(", тип: %s", *node.UnitType)
+		if node.WeightPerMeter != nil {
+			rolled += fmt.Sprintf(", вес/м: %g", *node.WeightPerMeter)
+		}
+		if node.PieceLength != nil {
+			rolled += fmt.Sprintf(", длина/шт: %g", *node.PieceLength)
+		}
+		if node.DefaultUnitID != nil {
+			rolled += fmt.Sprintf(", ед.по умолч.: %d", *node.DefaultUnitID)
+		}
+	}
+	fmt.Printf("ID: %d, название: %s, тип: %s%s%s, порядок: %d%s\n",
+		node.ID, node.Name, node.NodeType, term, unit, node.SortOrder, rolled)
 }
 
 func readNodeID(reader *bufio.Reader) *int {
