@@ -746,15 +746,17 @@ func updateEnum(ctx context.Context, repo repository.Repository, reader *bufio.R
 		name = enum.Name
 	}
 	fmt.Print("Введите описание (пусто для старого): ")
-	description := readLine(reader)
-	if description == "" {
-		description = *enum.Description
+	newDesc := readLine(reader)
+	var descPtr *string
+	if newDesc == "" {
+		descPtr = enum.Description
+	} else {
+		descPtr = &newDesc
 	}
-	descr := &description
 	req := models.UpdateEnumRequest{
 		ID:          enum.ID,
 		Name:        name,
-		Description: descr,
+		Description: descPtr,
 	}
 
 	err := repo.UpdateEnum(ctx, req)
