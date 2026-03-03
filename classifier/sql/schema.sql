@@ -1,4 +1,3 @@
--- Таблица единиц измерения
 CREATE TABLE IF NOT EXISTS units (
     id          SERIAL PRIMARY KEY,
     name        TEXT NOT NULL,
@@ -44,3 +43,21 @@ ON CONFLICT DO NOTHING;
 
 SELECT setval('classifier_nodes_id_seq', COALESCE((SELECT MAX(id) FROM classifier_nodes), 0));
 SELECT setval('units_id_seq', COALESCE((SELECT MAX(id) FROM units), 0));
+
+CREATE TABLE IF NOT EXISTS enums (
+    id          SERIAL PRIMARY KEY,
+    name        TEXT NOT NULL UNIQUE,            
+    description TEXT,                            
+    created_at  TIMESTAMPTZ DEFAULT now(),
+    updated_at  TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS enum_values (
+    id          SERIAL PRIMARY KEY,
+    enum_id     INTEGER REFERENCES enums(id) ON DELETE CASCADE,
+    value       TEXT NOT NULL,
+    sort_order  INTEGER DEFAULT 0,
+    created_at  TIMESTAMPTZ DEFAULT now(),
+    updated_at  TIMESTAMPTZ DEFAULT now(),
+    UNIQUE(enum_id, value)
+)
