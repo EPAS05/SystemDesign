@@ -9,6 +9,7 @@ type NodeType string
 const (
 	TypeMetaclass NodeType = "metaclass"
 	TypeLeaf      NodeType = "leaf"
+	TypeEnum      NodeType = "enum"
 )
 
 type Node struct {
@@ -23,6 +24,7 @@ type Node struct {
 	WeightPerMeter *float64  `db:"weight_per_meter"`
 	PieceLength    *float64  `db:"piece_length"`
 	DefaultUnitID  *int      `db:"default_unit_id"`
+	EnumID         *int      `db:"enum_id"`
 	CreatedAt      time.Time `db:"created_at"`
 	UpdatedAt      time.Time `db:"updated_at"`
 }
@@ -38,6 +40,7 @@ type CreateNodeRequest struct {
 	WeightPerMeter *float64
 	PieceLength    *float64
 	DefaultUnitID  *int
+	EnumID         *int
 }
 
 type SetNameRequest struct {
