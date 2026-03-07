@@ -29,7 +29,7 @@ func nodeMenu(repo repository.Repository, reader *bufio.Reader) {
 		fmt.Print("Выбор: ")
 
 		choice := readLine(reader)
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 		defer cancel()
 
 		switch choice {
@@ -71,6 +71,11 @@ func createNode(ctx context.Context, repo repository.Repository, reader *bufio.R
 	typeStr := readLine(reader)
 	nodeType := models.NodeType(typeStr)
 
+	if nodeType == models.TypeEnum {
+		fmt.Println("Перечисления создаются через меню перечислений.")
+		return
+	}
+
 	var isTerminal *bool
 
 	fmt.Print("ID родителя (Оставьте пустым для корня): ")
@@ -107,7 +112,7 @@ func createNode(ctx context.Context, repo repository.Repository, reader *bufio.R
 		unitID = &uid
 	}
 
-	fmt.Print("Порядок сортировки (оставьте пустым для авто) ")
+	fmt.Print("Порядок сортировки (оставьте пустым для авто): ")
 	orderStr := readLine(reader)
 	var sortOrder *int
 	if orderStr != "" {
@@ -119,22 +124,22 @@ func createNode(ctx context.Context, repo repository.Repository, reader *bufio.R
 		sortOrder = &order
 	}
 
-	var unitType *string
-	var weightPerMeter *float64
-	var pieceLength *float64
-	var defaultUnitID *int
+	var objectType *string
+	var objectID *int
 
 	if nodeType == models.TypeLeaf {
-
 		fmt.Print("Тип единицы (mass/length/piece): ")
 		ut := strings.ToLower(readLine(reader))
+		var unitType *string
 		if ut == "mass" || ut == "length" || ut == "piece" {
 			unitType = &ut
 		} else {
 			fmt.Println("Неверный тип, оставляем пустым.")
 		}
+
 		fmt.Print("Вес погонного метра (т/м): ")
 		wStr := readLine(reader)
+		var weightPerMeter *float64
 		if wStr != "" {
 			w, err := strconv.ParseFloat(wStr, 64)
 			if err == nil {
@@ -143,8 +148,10 @@ func createNode(ctx context.Context, repo repository.Repository, reader *bufio.R
 				fmt.Println("Неверное число, оставляем пустым.")
 			}
 		}
+
 		fmt.Print("Длина одной штуки (м): ")
 		pStr := readLine(reader)
+		var pieceLength *float64
 		if pStr != "" {
 			p, err := strconv.ParseFloat(pStr, 64)
 			if err == nil {
@@ -153,8 +160,10 @@ func createNode(ctx context.Context, repo repository.Repository, reader *bufio.R
 				fmt.Println("Неверное число, оставляем пустым.")
 			}
 		}
+
 		fmt.Print("ID единицы измерения по умолчанию (оставьте пустым, если не задана): ")
 		defStr := readLine(reader)
+		var defaultUnitID *int
 		if defStr != "" {
 			defID, err := strconv.Atoi(defStr)
 			if err == nil {
@@ -163,19 +172,33 @@ func createNode(ctx context.Context, repo repository.Repository, reader *bufio.R
 				fmt.Println("Неверный ID, оставляем пустым.")
 			}
 		}
+
+		prodReq := models.CreateProductRequest{
+			UnitType:       unitType,
+			WeightPerMeter: weightPerMeter,
+			PieceLength:    pieceLength,
+			DefaultUnitID:  defaultUnitID,
+		}
+		product, err := repo.CreateProduct(ctx, prodReq)
+		if err != nil {
+			fmt.Printf("Ошибка создания продукта: %v\n", err)
+			return
+		}
+		objectType := new(string)
+		*objectType = "product"
+		objectID = &product.ID
+		fmt.Printf("Продукт создан с ID: %d\n", product.ID)
 	}
 
 	req := models.CreateNodeRequest{
-		Name:           name,
-		ParentID:       parentID,
-		NodeType:       nodeType,
-		IsTerminal:     isTerminal,
-		UnitID:         unitID,
-		SortOrder:      sortOrder,
-		UnitType:       unitType,
-		WeightPerMeter: weightPerMeter,
-		PieceLength:    pieceLength,
-		DefaultUnitID:  defaultUnitID,
+		Name:       name,
+		ParentID:   parentID,
+		NodeType:   nodeType,
+		IsTerminal: isTerminal,
+		UnitID:     unitID,
+		SortOrder:  sortOrder,
+		ObjectType: objectType,
+		ObjectID:   objectID,
 	}
 
 	node, err := repo.CreateNode(ctx, req)
@@ -391,19 +414,10 @@ func printNode(node *models.Node) {
 	if node.UnitID != nil {
 		unit = fmt.Sprintf(", ID ЕИ: %d", *node.UnitID)
 	}
-	rolled := ""
-	if node.UnitType != nil {
-		rolled = fmt.Sprintf(", тип: %s", *node.UnitType)
-		if node.WeightPerMeter != nil {
-			rolled += fmt.Sprintf(", вес/м: %g", *node.WeightPerMeter)
-		}
-		if node.PieceLength != nil {
-			rolled += fmt.Sprintf(", длина/шт: %g", *node.PieceLength)
-		}
-		if node.DefaultUnitID != nil {
-			rolled += fmt.Sprintf(", ед.по умолч.: %d", *node.DefaultUnitID)
-		}
+	obj := ""
+	if node.ObjectType != nil && node.ObjectID != nil {
+		obj = fmt.Sprintf(", объект: %s:%d", *node.ObjectType, *node.ObjectID)
 	}
 	fmt.Printf("ID: %d, название: %s, тип: %s%s%s, порядок: %d%s\n",
-		node.ID, node.Name, node.NodeType, term, unit, node.SortOrder, rolled)
+		node.ID, node.Name, node.NodeType, term, unit, node.SortOrder, obj)
 }

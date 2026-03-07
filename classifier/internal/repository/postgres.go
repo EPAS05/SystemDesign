@@ -18,11 +18,11 @@ func NewPostgresRepository(db *sql.DB) *PostgresRepository {
 
 func (r *PostgresRepository) getNodeByID(ctx context.Context, id int) (*models.Node, error) {
 	query := `
-		SELECT id, name, parent_id, node_type, is_terminal, unit_id, sort_order, unit_type, weight_per_meter, piece_length, default_unit_id,enum_id, created_at, updated_at		
-		FROM classifier_nodes
-		WHERE id = $1;
-	`
-
+        SELECT id, name, parent_id, node_type, is_terminal, unit_id, sort_order,
+               object_type, object_id, created_at, updated_at
+        FROM classifier_nodes
+        WHERE id = $1
+    `
 	var node models.Node
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&node.ID,
@@ -32,6 +32,8 @@ func (r *PostgresRepository) getNodeByID(ctx context.Context, id int) (*models.N
 		&node.IsTerminal,
 		&node.UnitID,
 		&node.SortOrder,
+		&node.ObjectType,
+		&node.ObjectID,
 		&node.CreatedAt,
 		&node.UpdatedAt,
 	)

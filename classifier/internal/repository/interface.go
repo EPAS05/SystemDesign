@@ -36,4 +36,7 @@ type Repository interface {
 	UpdateEnumValue(ctx context.Context, req models.UpdateEnumValueRequest) error
 	DeleteEnumValue(ctx context.Context, id int) error
 	ReorderEnumValues(ctx context.Context, req models.ReorderEnumValuesRequest) error
+
+	CreateProduct(ctx context.Context, req models.CreateProductRequest) (*models.Product, error)
+	GetProduct(ctx context.Context, id int) (*models.Product, error)
 }
