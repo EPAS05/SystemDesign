@@ -32,11 +32,6 @@ func (r *PostgresRepository) getNodeByID(ctx context.Context, id int) (*models.N
 		&node.IsTerminal,
 		&node.UnitID,
 		&node.SortOrder,
-		&node.UnitType,
-		&node.WeightPerMeter,
-		&node.PieceLength,
-		&node.DefaultUnitID,
-		&node.EnumID,
 		&node.CreatedAt,
 		&node.UpdatedAt,
 	)

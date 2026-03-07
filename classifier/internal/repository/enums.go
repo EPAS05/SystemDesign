@@ -28,12 +28,9 @@ func (r *PostgresRepository) CreateEnum(ctx context.Context, req models.CreateEn
 	}
 
 	queryNode := `
-		INSERT INTO classifier_nodes (
-			name, parent_id, node_type, is_terminal, unit_id, sort_order,
-			unit_type, weight_per_meter, piece_length, default_unit_id, enum_id
-		)
+		INSERT INTO classifier_nodes (name, parent_id, node_type, is_terminal, unit_id, sort_order, object_type, object_id)
 		VALUES ($1, $2, 'enum', NULL, NULL, COALESCE((SELECT MAX(sort_order)+1 FROM classifier_nodes WHERE parent_id=3), 0),
-		        NULL, NULL, NULL, NULL, $3)
+		        'enum', $3)
 		RETURNING id
 	`
 	var nodeID int

@@ -6,6 +6,16 @@ CREATE TABLE IF NOT EXISTS units (
     updated_at  TIMESTAMPTZ DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS products (
+    id              SERIAL PRIMARY KEY,
+    unit_type       TEXT CHECK (unit_type IN ('mass', 'length', 'piece')),
+    weight_per_meter DOUBLE PRECISION,
+    piece_length    DOUBLE PRECISION,
+    default_unit_id INTEGER REFERENCES units(id) ON DELETE SET NULL,
+    created_at      TIMESTAMPTZ DEFAULT now(),
+    updated_at      TIMESTAMPTZ DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS enums (
     id          SERIAL PRIMARY KEY,
     name        TEXT NOT NULL UNIQUE,
@@ -29,38 +39,25 @@ CREATE TABLE IF NOT EXISTS classifier_nodes (
     name            TEXT NOT NULL,
     parent_id       INTEGER REFERENCES classifier_nodes(id) ON DELETE RESTRICT,
     node_type       TEXT NOT NULL CHECK (node_type IN ('metaclass', 'leaf', 'enum')),
-    is_terminal     BOOLEAN,
+    is_terminal     BOOLEAN,                     
     unit_id         INTEGER REFERENCES units(id) ON DELETE SET NULL,
     sort_order      INTEGER DEFAULT 0,
-    unit_type       TEXT CHECK (unit_type IN ('mass', 'length', 'piece')),
-    weight_per_meter DOUBLE PRECISION,
-    piece_length    DOUBLE PRECISION,
-    default_unit_id INTEGER REFERENCES units(id) ON DELETE SET NULL,
-    enum_id         INTEGER REFERENCES enums(id) ON DELETE CASCADE,
+    object_type     TEXT CHECK (object_type IN ('product', 'enum')),
+    object_id       INTEGER,
     created_at      TIMESTAMPTZ DEFAULT now(),
     updated_at      TIMESTAMPTZ DEFAULT now()
 );
 
 INSERT INTO classifier_nodes (id, name, parent_id, node_type, is_terminal, unit_id, sort_order,
-                              unit_type, weight_per_meter, piece_length, default_unit_id, enum_id)
-VALUES (1, 'Trash', NULL, 'metaclass', false, NULL, 0,
-        NULL, NULL, NULL, NULL, NULL)
-ON CONFLICT (id) DO NOTHING;
-
-INSERT INTO classifier_nodes (id, name, parent_id, node_type, is_terminal, unit_id, sort_order,
-                              unit_type, weight_per_meter, piece_length, default_unit_id, enum_id)
-VALUES (2, 'Изделия', NULL, 'metaclass', false, NULL, 0,
-        NULL, NULL, NULL, NULL, NULL)
-ON CONFLICT (id) DO NOTHING;
-
-INSERT INTO classifier_nodes (id, name, parent_id, node_type, is_terminal, unit_id, sort_order,
-                              unit_type, weight_per_meter, piece_length, default_unit_id, enum_id)
-VALUES (3, 'Перечисления', NULL, 'metaclass', false, NULL, 0,
-        NULL, NULL, NULL, NULL, NULL)
+                              object_type, object_id)
+VALUES (1, 'Trash', NULL, 'metaclass', false, NULL, 0, NULL, NULL),
+       (2, 'Изделия', NULL, 'metaclass', false, NULL, 0, NULL, NULL),
+       (3, 'Перечисления', NULL, 'metaclass', false, NULL, 0, NULL, NULL)
 ON CONFLICT (id) DO NOTHING;
 
 SELECT setval('classifier_nodes_id_seq', COALESCE((SELECT MAX(id) FROM classifier_nodes), 0));
 SELECT setval('units_id_seq', COALESCE((SELECT MAX(id) FROM units), 0));
+SELECT setval('products_id_seq', COALESCE((SELECT MAX(id) FROM products), 0));
 SELECT setval('enums_id_seq', COALESCE((SELECT MAX(id) FROM enums), 0));
 
 INSERT INTO units (name, multiplier) VALUES

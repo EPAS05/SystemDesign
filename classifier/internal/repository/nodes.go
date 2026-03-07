@@ -52,9 +52,9 @@ func (r *PostgresRepository) CreateNode(ctx context.Context, req models.CreateNo
 	var newIsTerminal interface{} = nil
 
 	query := `
-		INSERT INTO classifier_nodes (name, parent_id, node_type, is_terminal, unit_id, sort_order, unit_type, weight_per_meter, piece_length, default_unit_id, enum_id)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-		RETURNING id, name, parent_id, node_type, is_terminal, unit_id, sort_order, unit_type, weight_per_meter, piece_length, default_unit_id, enum_id, created_at, updated_at
+		INSERT INTO classifier_nodes (name, parent_id, node_type, is_terminal, unit_id, sort_order, object_type, object_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		RETURNING id, name, parent_id, node_type, is_terminal, unit_id, sort_order, object_type, object_id, created_at, updated_at
 	`
 	err := r.db.QueryRowContext(ctx, query,
 		req.Name,
@@ -63,11 +63,8 @@ func (r *PostgresRepository) CreateNode(ctx context.Context, req models.CreateNo
 		newIsTerminal,
 		unitID,
 		sortOrder,
-		req.UnitType,
-		req.WeightPerMeter,
-		req.PieceLength,
-		req.DefaultUnitID,
-		req.EnumID,
+		req.ObjectType,
+		req.ObjectID,
 	).Scan(
 		&node.ID,
 		&node.Name,
@@ -76,11 +73,8 @@ func (r *PostgresRepository) CreateNode(ctx context.Context, req models.CreateNo
 		&node.IsTerminal,
 		&node.UnitID,
 		&node.SortOrder,
-		&node.UnitType,
-		&node.WeightPerMeter,
-		&node.PieceLength,
-		&node.DefaultUnitID,
-		&node.EnumID,
+		&node.ObjectType,
+		&node.ObjectID,
 		&node.CreatedAt,
 		&node.UpdatedAt,
 	)
@@ -97,9 +91,7 @@ func (r *PostgresRepository) CreateNode(ctx context.Context, req models.CreateNo
 		if err != nil {
 			return nil, fmt.Errorf("failed to update parent is_terminal: %w", err)
 		}
-
 	}
-
 	return &node, nil
 }
 
@@ -109,7 +101,7 @@ func (r *PostgresRepository) GetNode(ctx context.Context, id int) (*models.Node,
 
 func (r *PostgresRepository) GetChildren(ctx context.Context, parentID int) ([]*models.Node, error) {
 	query := `
-		SELECT id, name, parent_id, node_type, is_terminal, unit_id, sort_order, unit_type, weight_per_meter, piece_length, default_unit_id, enum_id, created_at, updated_at		
+		SELECT id, name, parent_id, node_type, is_terminal, unit_id, sort_order, object_type, object_id, created_at, updated_at
 		FROM classifier_nodes
 		WHERE parent_id = $1
 		ORDER BY sort_order, name
@@ -131,11 +123,8 @@ func (r *PostgresRepository) GetChildren(ctx context.Context, parentID int) ([]*
 			&node.IsTerminal,
 			&node.UnitID,
 			&node.SortOrder,
-			&node.UnitType,
-			&node.WeightPerMeter,
-			&node.PieceLength,
-			&node.DefaultUnitID,
-			&node.EnumID,
+			&node.ObjectType,
+			&node.ObjectID,
 			&node.CreatedAt,
 			&node.UpdatedAt,
 		); err != nil {
@@ -148,25 +137,22 @@ func (r *PostgresRepository) GetChildren(ctx context.Context, parentID int) ([]*
 
 func (r *PostgresRepository) GetAllDescendants(ctx context.Context, id int) ([]*models.Node, error) {
 	query := `
-        WITH RECURSIVE descendants AS (
-            SELECT id, name, parent_id, node_type, is_terminal, unit_id, sort_order,
-                   unit_type, weight_per_meter, piece_length, default_unit_id, enum_id,
-                   created_at, updated_at
-            FROM classifier_nodes
-            WHERE parent_id = $1
-            UNION ALL
-            SELECT n.id, n.name, n.parent_id, n.node_type, n.is_terminal, n.unit_id, n.sort_order,
-                   n.unit_type, n.weight_per_meter, n.piece_length, n.default_unit_id, n.enum_id,
-                   n.created_at, n.updated_at
-            FROM classifier_nodes n
-            INNER JOIN descendants d ON n.parent_id = d.id
-        )
-        SELECT id, name, parent_id, node_type, is_terminal, unit_id, sort_order,
-               unit_type, weight_per_meter, piece_length, default_unit_id, enum_id,
-               created_at, updated_at
-        FROM descendants
-        ORDER BY sort_order, name
-    `
+		WITH RECURSIVE descendants AS (
+			SELECT id, name, parent_id, node_type, is_terminal, unit_id, sort_order,
+			       object_type, object_id, created_at, updated_at
+			FROM classifier_nodes
+			WHERE parent_id = $1
+			UNION ALL
+			SELECT n.id, n.name, n.parent_id, n.node_type, n.is_terminal, n.unit_id, n.sort_order,
+			       n.object_type, n.object_id, n.created_at, n.updated_at
+			FROM classifier_nodes n
+			INNER JOIN descendants d ON n.parent_id = d.id
+		)
+		SELECT id, name, parent_id, node_type, is_terminal, unit_id, sort_order,
+		       object_type, object_id, created_at, updated_at
+		FROM descendants
+		ORDER BY sort_order, name
+	`
 	rows, err := r.db.QueryContext(ctx, query, id)
 	if err != nil {
 		return nil, err
@@ -184,11 +170,8 @@ func (r *PostgresRepository) GetAllDescendants(ctx context.Context, id int) ([]*
 			&node.IsTerminal,
 			&node.UnitID,
 			&node.SortOrder,
-			&node.UnitType,
-			&node.WeightPerMeter,
-			&node.PieceLength,
-			&node.DefaultUnitID,
-			&node.EnumID,
+			&node.ObjectType,
+			&node.ObjectID,
 			&node.CreatedAt,
 			&node.UpdatedAt,
 		); err != nil {
@@ -202,15 +185,18 @@ func (r *PostgresRepository) GetAllDescendants(ctx context.Context, id int) ([]*
 func (r *PostgresRepository) GetAllTerminalDescendants(ctx context.Context, nodeID int) ([]*models.Node, error) {
 	query := `
 		WITH RECURSIVE descendants AS (
-			SELECT id, name, parent_id, node_type, is_terminal, unit_id, sort_order, unit_type, weight_per_meter, piece_length, default_unit_id, enum_id, created_at, updated_at		
+			SELECT id, name, parent_id, node_type, is_terminal, unit_id, sort_order,
+			       object_type, object_id, created_at, updated_at
 			FROM classifier_nodes
 			WHERE parent_id = $1
 			UNION ALL
-			SELECT n.id, n.name, n.parent_id, n.node_type, n.is_terminal, n.unit_id, n.sort_order, n.created_at, n.updated_at
+			SELECT n.id, n.name, n.parent_id, n.node_type, n.is_terminal, n.unit_id, n.sort_order,
+			       n.object_type, n.object_id, n.created_at, n.updated_at
 			FROM classifier_nodes n
 			INNER JOIN descendants d ON n.parent_id = d.id
 		)
-		SELECT id, name, parent_id, node_type, is_terminal, unit_id, sort_order, unit_type, weight_per_meter, piece_length, default_unit_id, enum_id, created_at, updated_at		
+		SELECT id, name, parent_id, node_type, is_terminal, unit_id, sort_order,
+		       object_type, object_id, created_at, updated_at
 		FROM descendants
 		WHERE node_type = 'metaclass' AND is_terminal = true
 		ORDER BY sort_order, name
@@ -232,11 +218,8 @@ func (r *PostgresRepository) GetAllTerminalDescendants(ctx context.Context, node
 			&node.IsTerminal,
 			&node.UnitID,
 			&node.SortOrder,
-			&node.UnitType,
-			&node.WeightPerMeter,
-			&node.PieceLength,
-			&node.DefaultUnitID,
-			&node.EnumID,
+			&node.ObjectType,
+			&node.ObjectID,
 			&node.CreatedAt,
 			&node.UpdatedAt,
 		); err != nil {
@@ -249,26 +232,23 @@ func (r *PostgresRepository) GetAllTerminalDescendants(ctx context.Context, node
 
 func (r *PostgresRepository) GetAllAncestors(ctx context.Context, id int) ([]*models.Node, error) {
 	query := `
-        WITH RECURSIVE ancestors AS (
-            SELECT id, name, parent_id, node_type, is_terminal, unit_id, sort_order,
-                   unit_type, weight_per_meter, piece_length, default_unit_id, enum_id,
-                   created_at, updated_at
-            FROM classifier_nodes
-            WHERE id = $1
-            UNION ALL
-            SELECT n.id, n.name, n.parent_id, n.node_type, n.is_terminal, n.unit_id, n.sort_order,
-                   n.unit_type, n.weight_per_meter, n.piece_length, n.default_unit_id, n.enum_id,
-                   n.created_at, n.updated_at
-            FROM classifier_nodes n
-            INNER JOIN ancestors a ON n.id = a.parent_id
-        )
-        SELECT id, name, parent_id, node_type, is_terminal, unit_id, sort_order,
-               unit_type, weight_per_meter, piece_length, default_unit_id, enum_id,
-               created_at, updated_at
-        FROM ancestors
-        WHERE id != $1
-        ORDER BY sort_order, name
-    `
+		WITH RECURSIVE ancestors AS (
+			SELECT id, name, parent_id, node_type, is_terminal, unit_id, sort_order,
+			       object_type, object_id, created_at, updated_at
+			FROM classifier_nodes
+			WHERE id = $1
+			UNION ALL
+			SELECT n.id, n.name, n.parent_id, n.node_type, n.is_terminal, n.unit_id, n.sort_order,
+			       n.object_type, n.object_id, n.created_at, n.updated_at
+			FROM classifier_nodes n
+			INNER JOIN ancestors a ON n.id = a.parent_id
+		)
+		SELECT id, name, parent_id, node_type, is_terminal, unit_id, sort_order,
+		       object_type, object_id, created_at, updated_at
+		FROM ancestors
+		WHERE id != $1
+		ORDER BY sort_order, name
+	`
 	rows, err := r.db.QueryContext(ctx, query, id)
 	if err != nil {
 		return nil, err
@@ -286,11 +266,8 @@ func (r *PostgresRepository) GetAllAncestors(ctx context.Context, id int) ([]*mo
 			&node.IsTerminal,
 			&node.UnitID,
 			&node.SortOrder,
-			&node.UnitType,
-			&node.WeightPerMeter,
-			&node.PieceLength,
-			&node.DefaultUnitID,
-			&node.EnumID,
+			&node.ObjectType,
+			&node.ObjectID,
 			&node.CreatedAt,
 			&node.UpdatedAt,
 		); err != nil {
