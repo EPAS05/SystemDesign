@@ -220,6 +220,10 @@ func getNode(ctx context.Context, repo repository.Repository, reader *bufio.Read
 		return
 	}
 	printNode(node)
+	if node.NodeType == models.TypeLeaf {
+		fmt.Println("\nПараметры изделия:")
+		showProductParameters(ctx, repo, *id)
+	}
 }
 
 func listChildren(ctx context.Context, repo repository.Repository, reader *bufio.Reader) {
@@ -420,4 +424,37 @@ func printNode(node *models.Node) {
 	}
 	fmt.Printf("ID: %d, название: %s, тип: %s%s%s, порядок: %d%s\n",
 		node.ID, node.Name, node.NodeType, term, unit, node.SortOrder, obj)
+}
+
+func showProductParameters(ctx context.Context, repo repository.Repository, productID int) {
+	values, err := repo.GetParameterValuesForProduct(ctx, productID)
+	if err != nil {
+		fmt.Printf("Ошибка получения параметров: %v\n", err)
+		return
+	}
+	if len(values) == 0 {
+		fmt.Println("  нет значений")
+		return
+	}
+	for _, v := range values {
+		param, err := repo.GetParameterDefinition(ctx, v.ParamDefID)
+		if err != nil {
+			continue
+		}
+		if param.ParameterType == "number" && v.ValueNumeric != nil {
+			unitStr := ""
+			if param.UnitID != nil {
+				unit, err := repo.GetUnit(ctx, *param.UnitID)
+				if err == nil {
+					unitStr = fmt.Sprintf(" %s", unit.Name)
+				}
+			}
+			fmt.Printf("  %s: %.2f%s\n", param.Name, *v.ValueNumeric, unitStr)
+		} else if param.ParameterType == "enum" && v.ValueEnumID != nil {
+			enumVal, err := repo.GetEnumValue(ctx, *v.ValueEnumID)
+			if err == nil {
+				fmt.Printf("  %s: %s\n", param.Name, enumVal.Value)
+			}
+		}
+	}
 }

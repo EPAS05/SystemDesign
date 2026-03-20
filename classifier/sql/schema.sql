@@ -49,6 +49,41 @@ CREATE TABLE IF NOT EXISTS classifier_nodes (
     updated_at      TIMESTAMPTZ DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS parameter_definitions (
+    id              SERIAL PRIMARY KEY,
+    class_node_id   INTEGER NOT NULL REFERENCES classifier_nodes(id) ON DELETE CASCADE,
+    name            TEXT NOT NULL,
+    description     TEXT,
+    parameter_type  TEXT NOT NULL CHECK (parameter_type IN ('number', 'enum')),
+    unit_id         INTEGER REFERENCES units(id) ON DELETE SET NULL,
+    enum_id         INTEGER REFERENCES enums(id) ON DELETE SET NULL,
+    is_required     BOOLEAN DEFAULT false,
+    sort_order      INTEGER DEFAULT 0,
+    created_at      TIMESTAMPTZ DEFAULT now(),
+    updated_at      TIMESTAMPTZ DEFAULT now(),
+    UNIQUE(class_node_id, name)
+);
+
+CREATE TABLE IF NOT EXISTS parameter_constraints (
+    id              SERIAL PRIMARY KEY,
+    param_def_id    INTEGER NOT NULL REFERENCES parameter_definitions(id) ON DELETE CASCADE,
+    min_value       DOUBLE PRECISION,
+    max_value       DOUBLE PRECISION,
+    created_at      TIMESTAMPTZ DEFAULT now(),
+    updated_at      TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS parameter_values (
+    id              SERIAL PRIMARY KEY,
+    product_node_id INTEGER NOT NULL REFERENCES classifier_nodes(id) ON DELETE CASCADE,
+    param_def_id    INTEGER NOT NULL REFERENCES parameter_definitions(id) ON DELETE CASCADE,
+    value_numeric   DOUBLE PRECISION,
+    value_enum_id   INTEGER REFERENCES enum_values(id) ON DELETE SET NULL,
+    created_at      TIMESTAMPTZ DEFAULT now(),
+    updated_at      TIMESTAMPTZ DEFAULT now(),
+    UNIQUE(product_node_id, param_def_id)
+);
+
 INSERT INTO classifier_nodes (id, name, parent_id, node_type, is_terminal, unit_id, sort_order,
                               object_type, object_id)
 VALUES (1, 'Trash', NULL, 'metaclass', false, NULL, 0, NULL, NULL),
@@ -63,11 +98,6 @@ VALUES (4, 'Числовые', 3, 'metaclass', false, NULL, 0, NULL, NULL),
        (6, 'Картинки', 3, 'metaclass', false, NULL, 0, NULL, NULL)
 ON CONFLICT (id) DO NOTHING;
 
-SELECT setval('classifier_nodes_id_seq', COALESCE((SELECT MAX(id) FROM classifier_nodes), 0));
-SELECT setval('units_id_seq', COALESCE((SELECT MAX(id) FROM units), 0));
-SELECT setval('products_id_seq', COALESCE((SELECT MAX(id) FROM products), 0));
-SELECT setval('enums_id_seq', COALESCE((SELECT MAX(id) FROM enums), 0));
-
 INSERT INTO units (name, multiplier) VALUES
     ('метр', 1.0),
     ('миллиметр', 0.001),
@@ -78,3 +108,8 @@ INSERT INTO units (name, multiplier) VALUES
     ('грамм', 0.000001),
     ('штука', 1.0)
 ON CONFLICT DO NOTHING;
+
+SELECT setval('classifier_nodes_id_seq', COALESCE((SELECT MAX(id) FROM classifier_nodes), 0));
+SELECT setval('units_id_seq', COALESCE((SELECT MAX(id) FROM units), 0));
+SELECT setval('products_id_seq', COALESCE((SELECT MAX(id) FROM products), 0));
+SELECT setval('enums_id_seq', COALESCE((SELECT MAX(id) FROM enums), 0));

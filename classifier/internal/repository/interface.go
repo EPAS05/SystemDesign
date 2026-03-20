@@ -39,4 +39,18 @@ type Repository interface {
 
 	CreateProduct(ctx context.Context, req models.CreateProductRequest) (*models.Product, error)
 	GetProduct(ctx context.Context, id int) (*models.Product, error)
+
+	CreateParameterDefinition(ctx context.Context, req models.CreateParameterDefinitionRequest) (*models.ParameterDefinition, error)
+	GetParameterDefinition(ctx context.Context, id int) (*models.ParameterDefinition, error)
+	GetParameterDefinitionsForClass(ctx context.Context, classNodeID int) ([]*models.ParameterDefinition, error)
+	UpdateParameterDefinition(ctx context.Context, req models.UpdateParameterDefinitionRequest) error
+	DeleteParameterDefinition(ctx context.Context, id int) error
+
+	SetParameterValue(ctx context.Context, req models.CreateParameterValueRequest) (*models.ParameterValue, error)
+	GetParameterValuesForProduct(ctx context.Context, productNodeID int) ([]*models.ParameterValue, error)
+	UpdateParameterValue(ctx context.Context, req models.UpdateParameterValueRequest) error
+	DeleteParameterValue(ctx context.Context, id int) error
+	GetParameterConstraints(ctx context.Context, paramDefID int) (*models.ParameterConstraint, error)
+
+	FindProductsByParameters(ctx context.Context, classNodeID int, filters []models.ParameterFilter) ([]*models.Node, error)
 }

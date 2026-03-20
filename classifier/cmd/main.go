@@ -25,7 +25,8 @@ func main() {
 		fmt.Println("1. Операции с узлами")
 		fmt.Println("2. Операции с ЕИ")
 		fmt.Println("3. Операции с перечислениями")
-		fmt.Println("4. Выход")
+		fmt.Println("4. Параметры")
+		fmt.Println("5. Выход")
 		fmt.Print("Выбор: ")
 
 		choice := readLine(reader)
@@ -37,6 +38,8 @@ func main() {
 		case "3":
 			enumMenu(repo, reader)
 		case "4":
+			paramMenu(repo, reader)
+		case "5":
 			fmt.Println("Завершение работы!")
 			return
 		default:
