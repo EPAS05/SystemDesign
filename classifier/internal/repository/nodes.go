@@ -461,6 +461,13 @@ func (r *PostgresRepository) checkChildCompatibility(parent *models.Node, childT
 		return nil
 	}
 
+	if childType == models.TypeEnum {
+		if parent.ID != 3 && parent.ID != 4 && parent.ID != 5 && parent.ID != 6 {
+			return ErrEnum
+		}
+		return nil
+	}
+
 	if parent.IsTerminal == nil {
 		return nil
 	}

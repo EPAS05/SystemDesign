@@ -45,22 +45,47 @@ func createEnum(ctx context.Context, repo repository.Repository, reader *bufio.R
 		fmt.Println("Название обязательно")
 		return
 	}
+
 	fmt.Print("Введите описание (необязательно): ")
 	desc := readLine(reader)
 	var description *string
 	if desc != "" {
 		description = &desc
 	}
+
+	fmt.Println("Выберите тип перечисления:")
+	fmt.Println("1. Числовое")
+	fmt.Println("2. Строковое")
+	fmt.Println("3. Картинки")
+	fmt.Print("Ваш выбор (1-3): ")
+	choice := readLine(reader)
+
+	var enumType string
+	switch choice {
+	case "1":
+		enumType = "number"
+	case "2":
+		enumType = "string"
+	case "3":
+		enumType = "image"
+	default:
+		fmt.Println("Неверный выбор.")
+		return
+	}
+
 	req := models.CreateEnumRequest{
 		Name:        name,
 		Description: description,
+		Type:        enumType,
+		ParentID:    nil,
 	}
+
 	enum, err := repo.CreateEnum(ctx, req)
 	if err != nil {
 		fmt.Printf("Ошибка: %v\n", err)
 		return
 	}
-	fmt.Printf("Перечисление создано с ID: %d\n", enum.ID)
+	fmt.Printf("Перечисление создано с ID: %d (тип: %s)\n", enum.ID, enum.Type)
 }
 
 func listEnums(ctx context.Context, repo repository.Repository) {
@@ -79,7 +104,7 @@ func listEnums(ctx context.Context, repo repository.Repository) {
 		if e.Description != nil {
 			desc = fmt.Sprintf(" (%s)", *e.Description)
 		}
-		fmt.Printf("ID: %d, Название: %s%s\n", e.ID, e.Name, desc)
+		fmt.Printf("ID: %d, Название: %s, Тип: %s%s\n", e.ID, e.Name, e.Type, desc)
 	}
 }
 
@@ -194,10 +219,12 @@ func updateEnum(ctx context.Context, repo repository.Repository, reader *bufio.R
 	} else {
 		descPtr = &newDesc
 	}
+
 	req := models.UpdateEnumRequest{
 		ID:          enum.ID,
 		Name:        name,
 		Description: descPtr,
+		Type:        enum.Type,
 	}
 
 	err := repo.UpdateEnum(ctx, req)
@@ -205,7 +232,7 @@ func updateEnum(ctx context.Context, repo repository.Repository, reader *bufio.R
 		fmt.Printf("Ошибка: %v\n", err)
 		return
 	}
-	fmt.Println("Значение обновлено")
+	fmt.Println("Перечисление обновлено")
 }
 
 func updateEnumValue(ctx context.Context, repo repository.Repository, reader *bufio.Reader, enumID int) {

@@ -8,6 +8,19 @@ import (
 )
 
 func (r *PostgresRepository) CreateEnum(ctx context.Context, req models.CreateEnumRequest) (*models.Enum, error) {
+	parentID := 3
+	if req.ParentID != nil {
+		parentID = *req.ParentID
+	} else {
+		switch req.Type {
+		case "number":
+			parentID = 4
+		case "string":
+			parentID = 5
+		case "image":
+			parentID = 6
+		}
+	}
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -16,25 +29,27 @@ func (r *PostgresRepository) CreateEnum(ctx context.Context, req models.CreateEn
 
 	var enum models.Enum
 	queryEnum := `
-		INSERT INTO enums (name, description)
-		VALUES ($1, $2)
-		RETURNING id, name, description, created_at, updated_at
-	`
-	err = tx.QueryRowContext(ctx, queryEnum, req.Name, req.Description).Scan(
-		&enum.ID, &enum.Name, &enum.Description, &enum.CreatedAt, &enum.UpdatedAt,
+        INSERT INTO enums (name, description, type)
+        VALUES ($1, $2, $3)
+        RETURNING id, name, description, type, created_at, updated_at
+    `
+	err = tx.QueryRowContext(ctx, queryEnum, req.Name, req.Description, req.Type).Scan(
+		&enum.ID, &enum.Name, &enum.Description, &enum.Type, &enum.CreatedAt, &enum.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err
 	}
 
 	queryNode := `
-		INSERT INTO classifier_nodes (name, parent_id, node_type, is_terminal, unit_id, sort_order, object_type, object_id)
-		VALUES ($1, $2, 'enum', NULL, NULL, COALESCE((SELECT MAX(sort_order)+1 FROM classifier_nodes WHERE parent_id=3), 0),
-		        'enum', $3)
-		RETURNING id
-	`
+        INSERT INTO classifier_nodes (name, parent_id, node_type, is_terminal, unit_id, sort_order,
+                                       object_type, object_id)
+        VALUES ($1, $2, 'enum', NULL, NULL,
+                COALESCE((SELECT MAX(sort_order)+1 FROM classifier_nodes WHERE parent_id = $2), 0),
+                'enum', $3)
+        RETURNING id
+    `
 	var nodeID int
-	err = tx.QueryRowContext(ctx, queryNode, req.Name, 3, enum.ID).Scan(&nodeID)
+	err = tx.QueryRowContext(ctx, queryNode, req.Name, parentID, enum.ID).Scan(&nodeID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create enum node: %w", err)
 	}
@@ -48,11 +63,11 @@ func (r *PostgresRepository) CreateEnum(ctx context.Context, req models.CreateEn
 func (r *PostgresRepository) GetEnum(ctx context.Context, id int) (*models.Enum, error) {
 	var enum models.Enum
 	query := `
-		SELECT id, name, description, created_at, updated_at 
-		FROM enums WHERE id = $1
-	`
+        SELECT id, name, description, type, created_at, updated_at
+        FROM enums WHERE id = $1
+    `
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
-		&enum.ID, &enum.Name, &enum.Description, &enum.CreatedAt, &enum.UpdatedAt,
+		&enum.ID, &enum.Name, &enum.Description, &enum.Type, &enum.CreatedAt, &enum.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
@@ -65,10 +80,10 @@ func (r *PostgresRepository) GetEnum(ctx context.Context, id int) (*models.Enum,
 
 func (r *PostgresRepository) GetAllEnums(ctx context.Context) ([]*models.Enum, error) {
 	query := `
-		SELECT id, name, description, created_at, updated_at 
-		FROM enums 
-		ORDER BY name
-	`
+        SELECT id, name, description, type, created_at, updated_at
+        FROM enums
+        ORDER BY name
+    `
 	rows, err := r.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
@@ -78,7 +93,7 @@ func (r *PostgresRepository) GetAllEnums(ctx context.Context) ([]*models.Enum, e
 	var enums []*models.Enum
 	for rows.Next() {
 		var e models.Enum
-		if err := rows.Scan(&e.ID, &e.Name, &e.Description, &e.CreatedAt, &e.UpdatedAt); err != nil {
+		if err := rows.Scan(&e.ID, &e.Name, &e.Description, &e.Type, &e.CreatedAt, &e.UpdatedAt); err != nil {
 			return nil, err
 		}
 		enums = append(enums, &e)
@@ -94,11 +109,11 @@ func (r *PostgresRepository) UpdateEnum(ctx context.Context, req models.UpdateEn
 	defer tx.Rollback()
 
 	queryEnum := `
-		UPDATE enums 
-		SET name = $1, description = $2, updated_at = now() 
-		WHERE id = $3
-	`
-	result, err := tx.ExecContext(ctx, queryEnum, req.Name, req.Description, req.ID)
+        UPDATE enums
+        SET name = $1, description = $2, type = $3, updated_at = now()
+        WHERE id = $4
+    `
+	result, err := tx.ExecContext(ctx, queryEnum, req.Name, req.Description, req.Type, req.ID)
 	if err != nil {
 		return err
 	}
@@ -108,10 +123,10 @@ func (r *PostgresRepository) UpdateEnum(ctx context.Context, req models.UpdateEn
 	}
 
 	queryNode := `
-		UPDATE classifier_nodes
-		SET name = $1, updated_at = now()
-		WHERE enum_id = $2
-	`
+        UPDATE classifier_nodes
+        SET name = $1, updated_at = now()
+        WHERE enum_id = $2
+    `
 	_, err = tx.ExecContext(ctx, queryNode, req.Name, req.ID)
 	if err != nil {
 		return err

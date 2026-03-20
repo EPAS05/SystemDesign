@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS enums (
     id          SERIAL PRIMARY KEY,
     name        TEXT NOT NULL UNIQUE,
     description TEXT,
+    type        TEXT NOT NULL CHECK (type IN ('number', 'string', 'image')),
     created_at  TIMESTAMPTZ DEFAULT now(),
     updated_at  TIMESTAMPTZ DEFAULT now()
 );
@@ -53,6 +54,13 @@ INSERT INTO classifier_nodes (id, name, parent_id, node_type, is_terminal, unit_
 VALUES (1, 'Trash', NULL, 'metaclass', false, NULL, 0, NULL, NULL),
        (2, 'Изделия', NULL, 'metaclass', false, NULL, 0, NULL, NULL),
        (3, 'Перечисления', NULL, 'metaclass', false, NULL, 0, NULL, NULL)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO classifier_nodes (id, name, parent_id, node_type, is_terminal, unit_id, sort_order,
+                              object_type, object_id)
+VALUES (4, 'Числовые', 3, 'metaclass', false, NULL, 0, NULL, NULL),
+       (5, 'Строковые', 3, 'metaclass', false, NULL, 0, NULL, NULL),
+       (6, 'Картинки', 3, 'metaclass', false, NULL, 0, NULL, NULL)
 ON CONFLICT (id) DO NOTHING;
 
 SELECT setval('classifier_nodes_id_seq', COALESCE((SELECT MAX(id) FROM classifier_nodes), 0));
