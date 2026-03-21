@@ -178,6 +178,10 @@ func createParameterDefinition(repo repository.Repository, reader *bufio.Reader)
 					maxVal = &max
 				}
 			}
+			if minVal != nil && maxVal != nil && *minVal > *maxVal {
+				fmt.Println("Минимальное значение не может быть больше максимального.")
+				return
+			}
 			constraints = &models.ParameterConstraint{
 				MinValue: minVal,
 				MaxValue: maxVal,

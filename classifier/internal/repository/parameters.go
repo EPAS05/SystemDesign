@@ -16,7 +16,11 @@ func (r *PostgresRepository) CreateParameterDefinition(ctx context.Context, req 
 	if node.NodeType != models.TypeMetaclass {
 		return nil, ErrInvalidParent
 	}
-
+	if req.Constraints != nil && req.Constraints.MinValue != nil && req.Constraints.MaxValue != nil {
+		if *req.Constraints.MinValue > *req.Constraints.MaxValue {
+			return nil, errors.New("minimum value cannot be greater than maximum value")
+		}
+	}
 	sortOrder := 0
 	if req.SortOrder != nil {
 		sortOrder = *req.SortOrder
