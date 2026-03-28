@@ -20,16 +20,14 @@ func enumMenu(repo repository.Repository, reader *bufio.Reader) {
 		fmt.Println("4. Назад в главное меню")
 		fmt.Print("Выбор: ")
 		choice := readLine(reader)
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
 
 		switch choice {
 		case "1":
-			createEnum(ctx, repo, reader)
+			createEnum(repo, reader)
 		case "2":
-			listEnums(ctx, repo)
+			listEnums(repo)
 		case "3":
-			selectEnum(ctx, repo, reader)
+			selectEnum(repo, reader)
 		case "4":
 			return
 		default:
@@ -38,7 +36,7 @@ func enumMenu(repo repository.Repository, reader *bufio.Reader) {
 	}
 }
 
-func createEnum(ctx context.Context, repo repository.Repository, reader *bufio.Reader) {
+func createEnum(repo repository.Repository, reader *bufio.Reader) {
 	fmt.Print("Введите название перечисления: ")
 	name := readLine(reader)
 	if name == "" {
@@ -53,21 +51,21 @@ func createEnum(ctx context.Context, repo repository.Repository, reader *bufio.R
 		description = &desc
 	}
 
-	fmt.Println("Выберите тип перечисления:")
-	fmt.Println("1. Числовое")
-	fmt.Println("2. Строковое")
+	fmt.Println("Выберите категорию перечисления:")
+	fmt.Println("1. Числовые")
+	fmt.Println("2. Строковые")
 	fmt.Println("3. Картинки")
 	fmt.Print("Ваш выбор (1-3): ")
 	choice := readLine(reader)
 
-	var enumType string
+	var typeNodeID int
 	switch choice {
 	case "1":
-		enumType = "number"
+		typeNodeID = 4
 	case "2":
-		enumType = "string"
+		typeNodeID = 5
 	case "3":
-		enumType = "image"
+		typeNodeID = 6
 	default:
 		fmt.Println("Неверный выбор.")
 		return
@@ -76,19 +74,22 @@ func createEnum(ctx context.Context, repo repository.Repository, reader *bufio.R
 	req := models.CreateEnumRequest{
 		Name:        name,
 		Description: description,
-		Type:        enumType,
-		ParentID:    nil,
+		TypeNodeID:  typeNodeID,
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 	enum, err := repo.CreateEnum(ctx, req)
 	if err != nil {
 		fmt.Printf("Ошибка: %v\n", err)
 		return
 	}
-	fmt.Printf("Перечисление создано с ID: %d (тип: %s)\n", enum.ID, enum.Type)
+	fmt.Printf("Перечисление создано с ID: %d\n", enum.ID)
 }
 
-func listEnums(ctx context.Context, repo repository.Repository) {
+func listEnums(repo repository.Repository) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 	enums, err := repo.GetAllEnums(ctx)
 	if err != nil {
 		fmt.Printf("Ошибка: %v\n", err)
@@ -104,11 +105,11 @@ func listEnums(ctx context.Context, repo repository.Repository) {
 		if e.Description != nil {
 			desc = fmt.Sprintf(" (%s)", *e.Description)
 		}
-		fmt.Printf("ID: %d, Название: %s, Тип: %s%s\n", e.ID, e.Name, e.Type, desc)
+		fmt.Printf("ID: %d, Название: %s, Категория: %d%s\n", e.ID, e.Name, e.TypeNodeID, desc)
 	}
 }
 
-func selectEnum(ctx context.Context, repo repository.Repository, reader *bufio.Reader) {
+func selectEnum(repo repository.Repository, reader *bufio.Reader) {
 	fmt.Print("Введите ID перечисления: ")
 	idStr := readLine(reader)
 	id, err := strconv.Atoi(idStr)
@@ -116,15 +117,17 @@ func selectEnum(ctx context.Context, repo repository.Repository, reader *bufio.R
 		fmt.Println("Неверный ID.")
 		return
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 	enum, err := repo.GetEnum(ctx, id)
 	if err != nil {
 		fmt.Printf("Ошибка: %v\n", err)
 		return
 	}
-	enumValuesMenu(ctx, repo, reader, enum)
+	enumValuesMenu(repo, reader, enum)
 }
 
-func enumValuesMenu(ctx context.Context, repo repository.Repository, reader *bufio.Reader, enum *models.Enum) {
+func enumValuesMenu(repo repository.Repository, reader *bufio.Reader, enum *models.Enum) {
 	descStr := ""
 	if enum.Description != nil {
 		descStr = *enum.Description
@@ -143,17 +146,17 @@ func enumValuesMenu(ctx context.Context, repo repository.Repository, reader *buf
 
 		switch choice {
 		case "1":
-			createEnumValue(ctx, repo, reader, enum.ID)
+			createEnumValue(repo, reader, enum.ID)
 		case "2":
-			listEnumValues(ctx, repo, enum.ID)
+			listEnumValues(repo, enum.ID)
 		case "3":
-			updateEnumValue(ctx, repo, reader, enum.ID)
+			updateEnumValue(repo, reader, enum.ID)
 		case "4":
-			deleteEnumValue(ctx, repo, reader, enum.ID)
+			deleteEnumValue(repo, reader, enum.ID)
 		case "5":
-			reorderEnumValues(ctx, repo, reader, enum.ID)
+			reorderEnumValues(repo, reader, enum.ID)
 		case "6":
-			updateEnum(ctx, repo, reader, enum)
+			updateEnum(repo, reader, enum)
 		case "7":
 			return
 		default:
@@ -162,7 +165,7 @@ func enumValuesMenu(ctx context.Context, repo repository.Repository, reader *buf
 	}
 }
 
-func createEnumValue(ctx context.Context, repo repository.Repository, reader *bufio.Reader, enumID int) {
+func createEnumValue(repo repository.Repository, reader *bufio.Reader, enumID int) {
 	fmt.Print("Введите значение: ")
 	value := readLine(reader)
 	fmt.Print("Порядок (оставьте пустым для авто): ")
@@ -181,6 +184,8 @@ func createEnumValue(ctx context.Context, repo repository.Repository, reader *bu
 		Value:     value,
 		SortOrder: sortOrder,
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 	ev, err := repo.CreateEnumValue(ctx, req)
 	if err != nil {
 		fmt.Printf("Ошибка: %v\n", err)
@@ -189,7 +194,9 @@ func createEnumValue(ctx context.Context, repo repository.Repository, reader *bu
 	fmt.Printf("Значение создано с ID: %d\n", ev.ID)
 }
 
-func listEnumValues(ctx context.Context, repo repository.Repository, enumID int) {
+func listEnumValues(repo repository.Repository, enumID int) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 	values, err := repo.GetEnumValues(ctx, enumID)
 	if err != nil {
 		fmt.Printf("Ошибка: %v\n", err)
@@ -205,7 +212,7 @@ func listEnumValues(ctx context.Context, repo repository.Repository, enumID int)
 	}
 }
 
-func updateEnum(ctx context.Context, repo repository.Repository, reader *bufio.Reader, enum *models.Enum) {
+func updateEnum(repo repository.Repository, reader *bufio.Reader, enum *models.Enum) {
 	fmt.Print("Введите имя (пусто для старого): ")
 	name := readLine(reader)
 	if name == "" {
@@ -224,9 +231,11 @@ func updateEnum(ctx context.Context, repo repository.Repository, reader *bufio.R
 		ID:          enum.ID,
 		Name:        name,
 		Description: descPtr,
-		Type:        enum.Type,
+		TypeNodeID:  enum.TypeNodeID,
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 	err := repo.UpdateEnum(ctx, req)
 	if err != nil {
 		fmt.Printf("Ошибка: %v\n", err)
@@ -235,11 +244,13 @@ func updateEnum(ctx context.Context, repo repository.Repository, reader *bufio.R
 	fmt.Println("Перечисление обновлено")
 }
 
-func updateEnumValue(ctx context.Context, repo repository.Repository, reader *bufio.Reader, enumID int) {
+func updateEnumValue(repo repository.Repository, reader *bufio.Reader, enumID int) {
 	fmt.Println("Все значения:")
-	listEnumValues(ctx, repo, enumID)
+	listEnumValues(repo, enumID)
 	fmt.Println("\nВведите ID для замены:")
 	valueID := readID(reader)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 	value, err := repo.GetEnumValue(ctx, *valueID)
 	if err != nil {
 		fmt.Printf("Ошибка получения значения: %s", err)
@@ -263,15 +274,17 @@ func updateEnumValue(ctx context.Context, repo repository.Repository, reader *bu
 	fmt.Println("Значение обновлено.")
 }
 
-func deleteEnumValue(ctx context.Context, repo repository.Repository, reader *bufio.Reader, enumID int) {
+func deleteEnumValue(repo repository.Repository, reader *bufio.Reader, enumID int) {
 	fmt.Println("Все значения:")
-	listEnumValues(ctx, repo, enumID)
+	listEnumValues(repo, enumID)
 
 	fmt.Println("\nВведите ID значения для удаления:")
 	valueID := readID(reader)
 	if valueID == nil {
 		return
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 	value, err := repo.GetEnumValue(ctx, *valueID)
 	if err != nil {
 		fmt.Printf("Ошибка получения значения: %v\n", err)
@@ -289,9 +302,9 @@ func deleteEnumValue(ctx context.Context, repo repository.Repository, reader *bu
 	fmt.Println("Значение удалено.")
 }
 
-func reorderEnumValues(ctx context.Context, repo repository.Repository, reader *bufio.Reader, enumID int) {
+func reorderEnumValues(repo repository.Repository, reader *bufio.Reader, enumID int) {
 	fmt.Println("Текущий порядок значений:")
-	listEnumValues(ctx, repo, enumID)
+	listEnumValues(repo, enumID)
 
 	fmt.Println("\nВведите новый порядок (ID значений через запятую в нужной последовательности):")
 	input := readLine(reader)
@@ -313,6 +326,8 @@ func reorderEnumValues(ctx context.Context, repo repository.Repository, reader *
 		fmt.Println("Не введено ни одного ID.")
 		return
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 	values, err := repo.GetEnumValues(ctx, enumID)
 	if err != nil {
 		fmt.Printf("Ошибка получения значений: %v\n", err)

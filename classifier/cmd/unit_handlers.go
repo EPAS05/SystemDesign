@@ -22,20 +22,18 @@ func unitMenu(repo repository.Repository, reader *bufio.Reader) {
 		fmt.Print("Выбор: ")
 
 		choice := readLine(reader)
-		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
-		defer cancel()
 
 		switch choice {
 		case "1":
-			createUnit(ctx, repo, reader)
+			createUnit(repo, reader)
 		case "2":
-			listUnits(ctx, repo)
+			listUnits(repo)
 		case "3":
-			getUnit(ctx, repo, reader)
+			getUnit(repo, reader)
 		case "4":
-			updateUnit(ctx, repo, reader)
+			updateUnit(repo, reader)
 		case "5":
-			deleteUnit(ctx, repo, reader)
+			deleteUnit(repo, reader)
 		case "6":
 			return
 		default:
@@ -44,7 +42,7 @@ func unitMenu(repo repository.Repository, reader *bufio.Reader) {
 	}
 }
 
-func createUnit(ctx context.Context, repo repository.Repository, reader *bufio.Reader) {
+func createUnit(repo repository.Repository, reader *bufio.Reader) {
 	fmt.Print("Имя: ")
 	name := readLine(reader)
 	fmt.Print("Множитель (например, 0.001 для мм): ")
@@ -58,6 +56,8 @@ func createUnit(ctx context.Context, repo repository.Repository, reader *bufio.R
 		Name:       name,
 		Multiplier: mult,
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 	unit, err := repo.CreateUnit(ctx, req)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
@@ -66,7 +66,9 @@ func createUnit(ctx context.Context, repo repository.Repository, reader *bufio.R
 	fmt.Printf("ЕИ создана с ID: %d\n", unit.ID)
 }
 
-func listUnits(ctx context.Context, repo repository.Repository) {
+func listUnits(repo repository.Repository) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 	units, err := repo.GetAllUnits(ctx)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
@@ -82,7 +84,7 @@ func listUnits(ctx context.Context, repo repository.Repository) {
 	}
 }
 
-func getUnit(ctx context.Context, repo repository.Repository, reader *bufio.Reader) {
+func getUnit(repo repository.Repository, reader *bufio.Reader) {
 	fmt.Print("Введите ID: ")
 	idStr := readLine(reader)
 	id, err := strconv.Atoi(idStr)
@@ -90,6 +92,8 @@ func getUnit(ctx context.Context, repo repository.Repository, reader *bufio.Read
 		fmt.Println("Неправильный ID.")
 		return
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 	unit, err := repo.GetUnit(ctx, id)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
@@ -98,13 +102,15 @@ func getUnit(ctx context.Context, repo repository.Repository, reader *bufio.Read
 	fmt.Printf("ID: %d, Имя: %s, Множитель: %g\n", unit.ID, unit.Name, unit.Multiplier)
 }
 
-func updateUnit(ctx context.Context, repo repository.Repository, reader *bufio.Reader) {
+func updateUnit(repo repository.Repository, reader *bufio.Reader) {
 	fmt.Print("Введите ID: ")
 	id := readID(reader)
 	if id == nil {
 		return
 	}
-	unit, err := repo.GetUnit(ctx, *id)
+	ctxGet, cancelGet := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancelGet()
+	unit, err := repo.GetUnit(ctxGet, *id)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		return
@@ -131,7 +137,10 @@ func updateUnit(ctx context.Context, repo repository.Repository, reader *bufio.R
 		Name:       name,
 		Multiplier: mult,
 	}
-	err = repo.UpdateUnit(ctx, req)
+
+	ctxUpdate, cancelUpdate := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancelUpdate()
+	err = repo.UpdateUnit(ctxUpdate, req)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		return
@@ -139,7 +148,7 @@ func updateUnit(ctx context.Context, repo repository.Repository, reader *bufio.R
 	fmt.Println("ЕИ изменен.")
 }
 
-func deleteUnit(ctx context.Context, repo repository.Repository, reader *bufio.Reader) {
+func deleteUnit(repo repository.Repository, reader *bufio.Reader) {
 	fmt.Print("Введите ID ЕИ для удаления: ")
 	id := readID(reader)
 	if id == nil {
@@ -151,6 +160,8 @@ func deleteUnit(ctx context.Context, repo repository.Repository, reader *bufio.R
 		fmt.Println("Удаление отменено.")
 		return
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 	err := repo.DeleteUnit(ctx, *id)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)

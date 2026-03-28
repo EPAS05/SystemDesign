@@ -28,13 +28,13 @@ type ParameterConstraint struct {
 }
 
 type ParameterValue struct {
-	ID            int       `db:"id"`
-	ProductNodeID int       `db:"product_node_id"`
-	ParamDefID    int       `db:"param_def_id"`
-	ValueNumeric  *float64  `db:"value_numeric"`
-	ValueEnumID   *int      `db:"value_enum_id"`
-	CreatedAt     time.Time `db:"created_at"`
-	UpdatedAt     time.Time `db:"updated_at"`
+	ID           int       `db:"id"`
+	ProductID    int       `db:"product_id"`
+	ParamDefID   int       `db:"param_def_id"`
+	ValueNumeric *float64  `db:"value_numeric"`
+	ValueEnumID  *int      `db:"value_enum_id"`
+	CreatedAt    time.Time `db:"created_at"`
+	UpdatedAt    time.Time `db:"updated_at"`
 }
 
 type CreateParameterDefinitionRequest struct {
@@ -61,10 +61,10 @@ type UpdateParameterDefinitionRequest struct {
 }
 
 type CreateParameterValueRequest struct {
-	ProductNodeID int
-	ParamDefID    int
-	ValueNumeric  *float64
-	ValueEnumID   *int
+	ProductID    int
+	ParamDefID   int
+	ValueNumeric *float64
+	ValueEnumID  *int
 }
 
 type UpdateParameterValueRequest struct {
@@ -73,7 +73,6 @@ type UpdateParameterValueRequest struct {
 	ValueEnumID  *int
 }
 
-// Для поиска
 type ParameterFilter struct {
 	ParamDefID int
 	Operator   string

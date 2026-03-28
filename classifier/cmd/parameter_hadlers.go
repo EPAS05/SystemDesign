@@ -64,9 +64,6 @@ func paramDefMenu(repo repository.Repository, reader *bufio.Reader) {
 }
 
 func createParameterDefinition(repo repository.Repository, reader *bufio.Reader) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
-	defer cancel()
-
 	fmt.Print("Введите ID класса (метакласса): ")
 	classIDStr := readLine(reader)
 	classID, err := strconv.Atoi(classIDStr)
@@ -101,7 +98,9 @@ func createParameterDefinition(repo repository.Repository, reader *bufio.Reader)
 	switch choice {
 	case "1":
 		paramType = "number"
-		units, err := repo.GetAllUnits(ctx)
+		ctxUnits, cancelUnits := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancelUnits()
+		units, err := repo.GetAllUnits(ctxUnits)
 		if err == nil && len(units) > 0 {
 			fmt.Println("Доступные единицы измерения:")
 			for _, u := range units {
@@ -118,7 +117,9 @@ func createParameterDefinition(repo repository.Repository, reader *bufio.Reader)
 		}
 	case "2":
 		paramType = "enum"
-		enums, err := repo.GetAllEnums(ctx)
+		ctxEnums, cancelEnums := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancelEnums()
+		enums, err := repo.GetAllEnums(ctxEnums)
 		if err != nil {
 			fmt.Printf("Ошибка получения перечислений: %v\n", err)
 			return
@@ -129,7 +130,7 @@ func createParameterDefinition(repo repository.Repository, reader *bufio.Reader)
 		}
 		fmt.Println("Доступные перечисления:")
 		for _, e := range enums {
-			fmt.Printf("  %d: %s (тип: %s)\n", e.ID, e.Name, e.Type)
+			fmt.Printf("  %d: %s (тип: %d)\n", e.ID, e.Name, e.TypeNodeID)
 		}
 		fmt.Print("Введите ID перечисления: ")
 		enumStr := readLine(reader)
@@ -201,6 +202,8 @@ func createParameterDefinition(repo repository.Repository, reader *bufio.Reader)
 		Constraints:   constraints,
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 	param, err := repo.CreateParameterDefinition(ctx, req)
 	if err != nil {
 		fmt.Printf("Ошибка создания параметра: %v\n", err)
@@ -210,9 +213,6 @@ func createParameterDefinition(repo repository.Repository, reader *bufio.Reader)
 }
 
 func listParameterDefinitionsForClass(repo repository.Repository, reader *bufio.Reader) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
-	defer cancel()
-
 	fmt.Print("Введите ID класса (метакласса): ")
 	idStr := readLine(reader)
 	classID, err := strconv.Atoi(idStr)
@@ -221,6 +221,8 @@ func listParameterDefinitionsForClass(repo repository.Repository, reader *bufio.
 		return
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 	params, err := repo.GetParameterDefinitionsForClass(ctx, classID)
 	if err != nil {
 		fmt.Printf("Ошибка: %v\n", err)
@@ -249,7 +251,9 @@ func listParameterDefinitionsForClass(repo repository.Repository, reader *bufio.
 			p.ID, p.Name, p.ParameterType, unitStr, enumStr, reqStr)
 
 		if p.ParameterType == "number" {
-			constraints, err := repo.GetParameterConstraints(ctx, p.ID)
+			ctxConstraints, cancelConstraints := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancelConstraints()
+			constraints, err := repo.GetParameterConstraints(ctxConstraints, p.ID)
 			if err == nil && constraints != nil {
 				constraintStr := ""
 				if constraints.MinValue != nil && constraints.MaxValue != nil {
@@ -268,8 +272,6 @@ func listParameterDefinitionsForClass(repo repository.Repository, reader *bufio.
 }
 
 func updateParameterDefinition(repo repository.Repository, reader *bufio.Reader) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
-	defer cancel()
 
 	fmt.Print("Введите ID параметра для редактирования: ")
 	idStr := readLine(reader)
@@ -279,7 +281,9 @@ func updateParameterDefinition(repo repository.Repository, reader *bufio.Reader)
 		return
 	}
 
-	param, err := repo.GetParameterDefinition(ctx, id)
+	ctxGet, cancelGet := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancelGet()
+	param, err := repo.GetParameterDefinition(ctxGet, id)
 	if err != nil {
 		fmt.Printf("Ошибка: %v\n", err)
 		return
@@ -365,6 +369,8 @@ func updateParameterDefinition(repo repository.Repository, reader *bufio.Reader)
 		SortOrder:   sortOrder,
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 	err = repo.UpdateParameterDefinition(ctx, req)
 	if err != nil {
 		fmt.Printf("Ошибка обновления: %v\n", err)
@@ -374,9 +380,6 @@ func updateParameterDefinition(repo repository.Repository, reader *bufio.Reader)
 }
 
 func deleteParameterDefinition(repo repository.Repository, reader *bufio.Reader) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
-	defer cancel()
-
 	fmt.Print("Введите ID параметра для удаления: ")
 	idStr := readLine(reader)
 	id, err := strconv.Atoi(idStr)
@@ -384,7 +387,8 @@ func deleteParameterDefinition(repo repository.Repository, reader *bufio.Reader)
 		fmt.Println("Неверный ID.")
 		return
 	}
-
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	defer cancel()
 	err = repo.DeleteParameterDefinition(ctx, id)
 	if err != nil {
 		fmt.Printf("Ошибка удаления: %v\n", err)
@@ -419,10 +423,7 @@ func paramValueMenu(repo repository.Repository, reader *bufio.Reader) {
 }
 
 func setParameterValue(repo repository.Repository, reader *bufio.Reader) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
-	defer cancel()
-
-	fmt.Print("Введите ID изделия (листа): ")
+	fmt.Print("Введите ID изделия: ")
 	productIDStr := readLine(reader)
 	productID, err := strconv.Atoi(productIDStr)
 	if err != nil {
@@ -430,24 +431,17 @@ func setParameterValue(repo repository.Repository, reader *bufio.Reader) {
 		return
 	}
 
-	ancestors, err := repo.GetAllAncestors(ctx, productID)
-	if err != nil {
-		fmt.Printf("Ошибка: %v\n", err)
-		return
-	}
-	classID := 0
-	for _, a := range ancestors {
-		if a.NodeType == models.TypeMetaclass {
-			classID = a.ID
-			break
-		}
-	}
-	if classID == 0 {
-		fmt.Println("Не удалось определить класс изделия.")
-		return
-	}
+	ctxGet, cancelGet := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancelGet()
 
-	params, err := repo.GetParameterDefinitionsForClass(ctx, classID)
+	product, err := repo.GetProduct(ctxGet, productID)
+	if err != nil {
+		fmt.Printf("Ошибка получения продукта: %v\n", err)
+		return
+	}
+	classID := product.ClassNodeID
+
+	params, err := repo.GetParameterDefinitionsForClass(ctxGet, classID)
 	if err != nil {
 		fmt.Printf("Ошибка получения параметров: %v\n", err)
 		return
@@ -495,7 +489,13 @@ func setParameterValue(repo repository.Repository, reader *bufio.Reader) {
 		}
 		valueNumeric = &num
 	case "enum":
-		values, err := repo.GetEnumValues(ctx, *targetParam.EnumID)
+		if targetParam.EnumID == nil {
+			fmt.Println("Ошибка: параметр перечисление не привязан к перечислению.")
+			return
+		}
+		ctxEnum, cancelEnum := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancelEnum()
+		values, err := repo.GetEnumValues(ctxEnum, *targetParam.EnumID)
 		if err != nil {
 			fmt.Printf("Ошибка получения значений: %v\n", err)
 			return
@@ -519,13 +519,15 @@ func setParameterValue(repo repository.Repository, reader *bufio.Reader) {
 	}
 
 	req := models.CreateParameterValueRequest{
-		ProductNodeID: productID,
-		ParamDefID:    paramID,
-		ValueNumeric:  valueNumeric,
-		ValueEnumID:   valueEnumID,
+		ProductID:    productID,
+		ParamDefID:   paramID,
+		ValueNumeric: valueNumeric,
+		ValueEnumID:  valueEnumID,
 	}
 
-	pv, err := repo.SetParameterValue(ctx, req)
+	ctxSet, cancelSet := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancelSet()
+	pv, err := repo.SetParameterValue(ctxSet, req)
 	if err != nil {
 		fmt.Printf("Ошибка установки значения: %v\n", err)
 		return
@@ -534,9 +536,6 @@ func setParameterValue(repo repository.Repository, reader *bufio.Reader) {
 }
 
 func getParameterValuesForProduct(repo repository.Repository, reader *bufio.Reader) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
-	defer cancel()
-
 	fmt.Print("Введите ID изделия (листа): ")
 	productIDStr := readLine(reader)
 	productID, err := strconv.Atoi(productIDStr)
@@ -544,8 +543,9 @@ func getParameterValuesForProduct(repo repository.Repository, reader *bufio.Read
 		fmt.Println("Неверный ID.")
 		return
 	}
-
-	values, err := repo.GetParameterValuesForProduct(ctx, productID)
+	ctxGet, cancelGet := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancelGet()
+	values, err := repo.GetParameterValuesForProduct(ctxGet, productID)
 	if err != nil {
 		fmt.Printf("Ошибка: %v\n", err)
 		return
@@ -557,6 +557,8 @@ func getParameterValuesForProduct(repo repository.Repository, reader *bufio.Read
 
 	fmt.Println("Значения параметров:")
 	for _, v := range values {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
 		param, err := repo.GetParameterDefinition(ctx, v.ParamDefID)
 		if err != nil {
 			continue
@@ -580,9 +582,6 @@ func getParameterValuesForProduct(repo repository.Repository, reader *bufio.Read
 }
 
 func deleteParameterValue(repo repository.Repository, reader *bufio.Reader) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
-	defer cancel()
-
 	fmt.Print("Введите ID значения параметра (из таблицы parameter_values): ")
 	idStr := readLine(reader)
 	id, err := strconv.Atoi(idStr)
@@ -590,6 +589,8 @@ func deleteParameterValue(repo repository.Repository, reader *bufio.Reader) {
 		fmt.Println("Неверный ID.")
 		return
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	defer cancel()
 	err = repo.DeleteParameterValue(ctx, id)
 	if err != nil {
 		fmt.Printf("Ошибка удаления: %v\n", err)

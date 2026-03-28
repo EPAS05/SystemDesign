@@ -6,8 +6,21 @@ CREATE TABLE IF NOT EXISTS units (
     updated_at  TIMESTAMPTZ DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS classifier_nodes (
+    id              SERIAL PRIMARY KEY,
+    name            TEXT NOT NULL,
+    parent_id       INTEGER REFERENCES classifier_nodes(id) ON DELETE RESTRICT,
+    is_terminal     BOOLEAN,                     
+    unit_id         INTEGER REFERENCES units(id) ON DELETE SET NULL,
+    sort_order      INTEGER DEFAULT 0,
+    created_at      TIMESTAMPTZ DEFAULT now(),
+    updated_at      TIMESTAMPTZ DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS products (
     id              SERIAL PRIMARY KEY,
+    name            TEXT NOT NULL,
+    class_node_id   INTEGER NOT NULL REFERENCES classifier_nodes(id) ON DELETE RESTRICT,
     unit_type       TEXT CHECK (unit_type IN ('mass', 'length', 'piece')),
     weight_per_meter DOUBLE PRECISION,
     piece_length    DOUBLE PRECISION,
@@ -20,7 +33,7 @@ CREATE TABLE IF NOT EXISTS enums (
     id          SERIAL PRIMARY KEY,
     name        TEXT NOT NULL UNIQUE,
     description TEXT,
-    type        TEXT NOT NULL CHECK (type IN ('number', 'string', 'image')),
+    type_node_id   INTEGER NOT NULL REFERENCES classifier_nodes(id) ON DELETE RESTRICT,
     created_at  TIMESTAMPTZ DEFAULT now(),
     updated_at  TIMESTAMPTZ DEFAULT now()
 );
@@ -33,20 +46,6 @@ CREATE TABLE IF NOT EXISTS enum_values (
     created_at  TIMESTAMPTZ DEFAULT now(),
     updated_at  TIMESTAMPTZ DEFAULT now(),
     UNIQUE(enum_id, value)
-);
-
-CREATE TABLE IF NOT EXISTS classifier_nodes (
-    id              SERIAL PRIMARY KEY,
-    name            TEXT NOT NULL,
-    parent_id       INTEGER REFERENCES classifier_nodes(id) ON DELETE RESTRICT,
-    node_type       TEXT NOT NULL CHECK (node_type IN ('metaclass', 'leaf', 'enum')),
-    is_terminal     BOOLEAN,                     
-    unit_id         INTEGER REFERENCES units(id) ON DELETE SET NULL,
-    sort_order      INTEGER DEFAULT 0,
-    object_type     TEXT CHECK (object_type IN ('product', 'enum')),
-    object_id       INTEGER,
-    created_at      TIMESTAMPTZ DEFAULT now(),
-    updated_at      TIMESTAMPTZ DEFAULT now()
 );
 
 CREATE TABLE IF NOT EXISTS parameter_definitions (
@@ -75,27 +74,25 @@ CREATE TABLE IF NOT EXISTS parameter_constraints (
 
 CREATE TABLE IF NOT EXISTS parameter_values (
     id              SERIAL PRIMARY KEY,
-    product_node_id INTEGER NOT NULL REFERENCES classifier_nodes(id) ON DELETE CASCADE,
+    product_id      INTEGER NOT NULL REFERENCES classifier_nodes(id) ON DELETE CASCADE,
     param_def_id    INTEGER NOT NULL REFERENCES parameter_definitions(id) ON DELETE CASCADE,
     value_numeric   DOUBLE PRECISION,
     value_enum_id   INTEGER REFERENCES enum_values(id) ON DELETE SET NULL,
     created_at      TIMESTAMPTZ DEFAULT now(),
     updated_at      TIMESTAMPTZ DEFAULT now(),
-    UNIQUE(product_node_id, param_def_id)
+    UNIQUE(product_id, param_def_id)
 );
 
-INSERT INTO classifier_nodes (id, name, parent_id, node_type, is_terminal, unit_id, sort_order,
-                              object_type, object_id)
-VALUES (1, 'Trash', NULL, 'metaclass', false, NULL, 0, NULL, NULL),
-       (2, 'Изделия', NULL, 'metaclass', false, NULL, 0, NULL, NULL),
-       (3, 'Перечисления', NULL, 'metaclass', false, NULL, 0, NULL, NULL)
+INSERT INTO classifier_nodes (id, name, parent_id, is_terminal, unit_id, sort_order)
+VALUES (1, 'Trash', NULL, false, NULL, 0),
+       (2, 'Изделия', NULL, false, NULL, 0),
+       (3, 'Перечисления', NULL, false, NULL, 0)
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO classifier_nodes (id, name, parent_id, node_type, is_terminal, unit_id, sort_order,
-                              object_type, object_id)
-VALUES (4, 'Числовые', 3, 'metaclass', false, NULL, 0, NULL, NULL),
-       (5, 'Строковые', 3, 'metaclass', false, NULL, 0, NULL, NULL),
-       (6, 'Картинки', 3, 'metaclass', false, NULL, 0, NULL, NULL)
+INSERT INTO classifier_nodes (id, name, parent_id, is_terminal, unit_id, sort_order)
+VALUES (4, 'Числовые', 3, false, NULL, 0),
+       (5, 'Строковые', 3, false, NULL, 0),
+       (6, 'Картинки', 3, false, NULL, 0)
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO units (name, multiplier) VALUES

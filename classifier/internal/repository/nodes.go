@@ -7,6 +7,7 @@ import (
 	"fmt"
 )
 
+// TODO: in get ancessors descendors add products
 const trashNodeID = 1
 
 func (r *PostgresRepository) CreateNode(ctx context.Context, req models.CreateNodeRequest) (*models.Node, error) {
@@ -20,10 +21,7 @@ func (r *PostgresRepository) CreateNode(ctx context.Context, req models.CreateNo
 		if err != nil {
 			return nil, err
 		}
-		if parent.NodeType != models.TypeMetaclass {
-			return nil, ErrInvalidParent
-		}
-		if err := r.checkChildCompatibility(parent, req.NodeType); err != nil {
+		if err := r.checkChildCompatibility(parent); err != nil {
 			return nil, err
 		}
 		if parent.IsTerminal == nil {
@@ -49,32 +47,26 @@ func (r *PostgresRepository) CreateNode(ctx context.Context, req models.CreateNo
 	}
 
 	var node models.Node
-	var newIsTerminal interface{} = nil
 
 	query := `
-		INSERT INTO classifier_nodes (name, parent_id, node_type, is_terminal, unit_id, sort_order, object_type, object_id)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-		RETURNING id, name, parent_id, node_type, is_terminal, unit_id, sort_order, object_type, object_id, created_at, updated_at
+		INSERT INTO classifier_nodes (name, parent_id, is_terminal, unit_id, sort_order)
+		VALUES ($1, $2, $3, $4, $5)
+		RETURNING id, name, parent_id, is_terminal, unit_id, sort_order, created_at, updated_at
 	`
+
 	err := r.db.QueryRowContext(ctx, query,
 		req.Name,
 		req.ParentID,
-		req.NodeType,
-		newIsTerminal,
+		nil,
 		unitID,
 		sortOrder,
-		req.ObjectType,
-		req.ObjectID,
 	).Scan(
 		&node.ID,
 		&node.Name,
 		&node.ParentID,
-		&node.NodeType,
 		&node.IsTerminal,
 		&node.UnitID,
 		&node.SortOrder,
-		&node.ObjectType,
-		&node.ObjectID,
 		&node.CreatedAt,
 		&node.UpdatedAt,
 	)
@@ -83,7 +75,7 @@ func (r *PostgresRepository) CreateNode(ctx context.Context, req models.CreateNo
 	}
 
 	if needUpdateParent {
-		newParentTerminal := req.NodeType == models.TypeLeaf
+		newParentTerminal := false
 		queryToUpdate := `
 			UPDATE classifier_nodes SET is_terminal = $1 WHERE id = $2
 		`
@@ -92,7 +84,9 @@ func (r *PostgresRepository) CreateNode(ctx context.Context, req models.CreateNo
 			return nil, fmt.Errorf("failed to update parent is_terminal: %w", err)
 		}
 	}
+
 	return &node, nil
+
 }
 
 func (r *PostgresRepository) GetNode(ctx context.Context, id int) (*models.Node, error) {
@@ -101,7 +95,7 @@ func (r *PostgresRepository) GetNode(ctx context.Context, id int) (*models.Node,
 
 func (r *PostgresRepository) GetChildren(ctx context.Context, parentID int) ([]*models.Node, error) {
 	query := `
-		SELECT id, name, parent_id, node_type, is_terminal, unit_id, sort_order, object_type, object_id, created_at, updated_at
+		SELECT id, name, parent_id, is_terminal, unit_id, sort_order, created_at, updated_at
 		FROM classifier_nodes
 		WHERE parent_id = $1
 		ORDER BY sort_order, name
@@ -119,12 +113,9 @@ func (r *PostgresRepository) GetChildren(ctx context.Context, parentID int) ([]*
 			&node.ID,
 			&node.Name,
 			&node.ParentID,
-			&node.NodeType,
 			&node.IsTerminal,
 			&node.UnitID,
 			&node.SortOrder,
-			&node.ObjectType,
-			&node.ObjectID,
 			&node.CreatedAt,
 			&node.UpdatedAt,
 		); err != nil {
@@ -138,18 +129,15 @@ func (r *PostgresRepository) GetChildren(ctx context.Context, parentID int) ([]*
 func (r *PostgresRepository) GetAllDescendants(ctx context.Context, id int) ([]*models.Node, error) {
 	query := `
 		WITH RECURSIVE descendants AS (
-			SELECT id, name, parent_id, node_type, is_terminal, unit_id, sort_order,
-			       object_type, object_id, created_at, updated_at
+			SELECT id, name, parent_id, is_terminal, unit_id, sort_order, created_at, updated_at
 			FROM classifier_nodes
 			WHERE parent_id = $1
 			UNION ALL
-			SELECT n.id, n.name, n.parent_id, n.node_type, n.is_terminal, n.unit_id, n.sort_order,
-			       n.object_type, n.object_id, n.created_at, n.updated_at
+			SELECT n.id, n.name, n.parent_id, n.is_terminal, n.unit_id, n.sort_order, n.created_at, n.updated_at
 			FROM classifier_nodes n
 			INNER JOIN descendants d ON n.parent_id = d.id
 		)
-		SELECT id, name, parent_id, node_type, is_terminal, unit_id, sort_order,
-		       object_type, object_id, created_at, updated_at
+		SELECT id, name, parent_id, is_terminal, unit_id, sort_order, created_at, updated_at
 		FROM descendants
 		ORDER BY sort_order, name
 	`
@@ -166,12 +154,9 @@ func (r *PostgresRepository) GetAllDescendants(ctx context.Context, id int) ([]*
 			&node.ID,
 			&node.Name,
 			&node.ParentID,
-			&node.NodeType,
 			&node.IsTerminal,
 			&node.UnitID,
 			&node.SortOrder,
-			&node.ObjectType,
-			&node.ObjectID,
 			&node.CreatedAt,
 			&node.UpdatedAt,
 		); err != nil {
@@ -185,20 +170,17 @@ func (r *PostgresRepository) GetAllDescendants(ctx context.Context, id int) ([]*
 func (r *PostgresRepository) GetAllTerminalDescendants(ctx context.Context, nodeID int) ([]*models.Node, error) {
 	query := `
 		WITH RECURSIVE descendants AS (
-			SELECT id, name, parent_id, node_type, is_terminal, unit_id, sort_order,
-			       object_type, object_id, created_at, updated_at
+			SELECT id, name, parent_id, is_terminal, unit_id, sort_order, created_at, updated_at
 			FROM classifier_nodes
 			WHERE parent_id = $1
 			UNION ALL
-			SELECT n.id, n.name, n.parent_id, n.node_type, n.is_terminal, n.unit_id, n.sort_order,
-			       n.object_type, n.object_id, n.created_at, n.updated_at
+			SELECT n.id, n.name, n.parent_id, n.is_terminal, n.unit_id, n.sort_order, n.created_at, n.updated_at
 			FROM classifier_nodes n
 			INNER JOIN descendants d ON n.parent_id = d.id
 		)
-		SELECT id, name, parent_id, node_type, is_terminal, unit_id, sort_order,
-		       object_type, object_id, created_at, updated_at
+		SELECT id, name, parent_id, is_terminal, unit_id, sort_order, created_at, updated_at
 		FROM descendants
-		WHERE node_type = 'metaclass' AND is_terminal = true
+		WHERE is_terminal = true
 		ORDER BY sort_order, name
 	`
 	rows, err := r.db.QueryContext(ctx, query, nodeID)
@@ -214,12 +196,9 @@ func (r *PostgresRepository) GetAllTerminalDescendants(ctx context.Context, node
 			&node.ID,
 			&node.Name,
 			&node.ParentID,
-			&node.NodeType,
 			&node.IsTerminal,
 			&node.UnitID,
 			&node.SortOrder,
-			&node.ObjectType,
-			&node.ObjectID,
 			&node.CreatedAt,
 			&node.UpdatedAt,
 		); err != nil {
@@ -233,18 +212,15 @@ func (r *PostgresRepository) GetAllTerminalDescendants(ctx context.Context, node
 func (r *PostgresRepository) GetAllAncestors(ctx context.Context, id int) ([]*models.Node, error) {
 	query := `
 		WITH RECURSIVE ancestors AS (
-			SELECT id, name, parent_id, node_type, is_terminal, unit_id, sort_order,
-			       object_type, object_id, created_at, updated_at
+			SELECT id, name, parent_id, is_terminal, unit_id, sort_order, created_at, updated_at
 			FROM classifier_nodes
 			WHERE id = $1
 			UNION ALL
-			SELECT n.id, n.name, n.parent_id, n.node_type, n.is_terminal, n.unit_id, n.sort_order,
-			       n.object_type, n.object_id, n.created_at, n.updated_at
+			SELECT n.id, n.name, n.parent_id, n.is_terminal, n.unit_id, n.sort_order, n.created_at, n.updated_at
 			FROM classifier_nodes n
 			INNER JOIN ancestors a ON n.id = a.parent_id
 		)
-		SELECT id, name, parent_id, node_type, is_terminal, unit_id, sort_order,
-		       object_type, object_id, created_at, updated_at
+		SELECT id, name, parent_id, is_terminal, unit_id, sort_order, created_at, updated_at
 		FROM ancestors
 		WHERE id != $1
 		ORDER BY sort_order, name
@@ -262,12 +238,9 @@ func (r *PostgresRepository) GetAllAncestors(ctx context.Context, id int) ([]*mo
 			&node.ID,
 			&node.Name,
 			&node.ParentID,
-			&node.NodeType,
 			&node.IsTerminal,
 			&node.UnitID,
 			&node.SortOrder,
-			&node.ObjectType,
-			&node.ObjectID,
 			&node.CreatedAt,
 			&node.UpdatedAt,
 		); err != nil {
@@ -305,10 +278,7 @@ func (r *PostgresRepository) SetParent(ctx context.Context, req models.SetParent
 		if err != nil {
 			return ErrNotFound
 		}
-		if parent.NodeType != models.TypeMetaclass {
-			return ErrInvalidParent
-		}
-		if err := r.checkChildCompatibility(parent, node.NodeType); err != nil {
+		if err := r.checkChildCompatibility(parent); err != nil {
 			return err
 		}
 		if err := r.checkCycle(ctx, node.ID, *req.NewParentID); err != nil {
@@ -323,7 +293,6 @@ func (r *PostgresRepository) SetParent(ctx context.Context, req models.SetParent
 	`
 	_, err = r.db.ExecContext(ctx, query, req.NewParentID, req.NodeId)
 	return err
-
 }
 
 func (r *PostgresRepository) SetName(ctx context.Context, req models.SetNameRequest) error {
@@ -372,12 +341,12 @@ func (r *PostgresRepository) DeleteNode(ctx context.Context, id int) error {
 	defer tx.Rollback()
 
 	selectNodeQuery := `
-		SELECT id, parent_id, node_type
+		SELECT id, parent_id, is_terminal
 		FROM classifier_nodes
 		WHERE id = $1 FOR UPDATE
 	`
 	var node models.Node
-	err = tx.QueryRowContext(ctx, selectNodeQuery, id).Scan(&node.ID, &node.ParentID, &node.NodeType)
+	err = tx.QueryRowContext(ctx, selectNodeQuery, id).Scan(&node.ID, &node.ParentID, &node.IsTerminal)
 	if err == sql.ErrNoRows {
 		return ErrNotFound
 	}
@@ -385,13 +354,18 @@ func (r *PostgresRepository) DeleteNode(ctx context.Context, id int) error {
 		return err
 	}
 
-	if node.NodeType == models.TypeEnum {
-		return ErrCantDeleteEnum
-	}
-
 	parentID := node.ParentID
 
-	if node.NodeType == models.TypeMetaclass {
+	if node.IsTerminal != nil && *node.IsTerminal {
+		_, err = tx.ExecContext(ctx, `UPDATE products SET class_node_id = $1 WHERE class_node_id = $2`, trashNodeID, id)
+		if err != nil {
+			return fmt.Errorf("failed to move products to trash: %w", err)
+		}
+		_, err = tx.ExecContext(ctx, `UPDATE enums SET type_node_id = $1 WHERE type_node_id = $2`, trashNodeID, id)
+		if err != nil {
+			return fmt.Errorf("failed to move enums to trash: %w", err)
+		}
+	} else if node.IsTerminal != nil && !*node.IsTerminal {
 		selectChildrenQuery := `
 			SELECT id FROM classifier_nodes
 			WHERE parent_id = $1 FOR UPDATE
@@ -456,37 +430,17 @@ func (r *PostgresRepository) DeleteNode(ctx context.Context, id int) error {
 	return tx.Commit()
 }
 
-func (r *PostgresRepository) checkChildCompatibility(parent *models.Node, childType models.NodeType) error {
+func (r *PostgresRepository) UpdateNodeIsTerminal(ctx context.Context, nodeID int, isTerminal *bool) error {
+	_, err := r.db.ExecContext(ctx, `UPDATE classifier_nodes SET is_terminal = $1, updated_at = now() WHERE id = $2`, isTerminal, nodeID)
+	return err
+}
+
+func (r *PostgresRepository) checkChildCompatibility(parent *models.Node) error {
 	if parent.ID == trashNodeID {
 		return nil
 	}
-
-	if childType == models.TypeEnum {
-		if parent.ID != 3 && parent.ID != 4 && parent.ID != 5 && parent.ID != 6 {
-			return ErrEnum
-		}
-		return nil
-	}
-
-	if parent.IsTerminal == nil {
-		return nil
-	}
-
-	if childType == models.TypeEnum {
-		if parent.ID != 3 {
-			return ErrEnum
-		}
-		return nil
-	}
-
-	if *parent.IsTerminal {
-		if childType != models.TypeLeaf {
-			return ErrTypeMismatch
-		}
-	} else {
-		if childType != models.TypeMetaclass {
-			return ErrTypeMismatch
-		}
+	if parent.IsTerminal != nil && *parent.IsTerminal {
+		return ErrInvalidParent
 	}
 	return nil
 }

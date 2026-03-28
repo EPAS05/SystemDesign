@@ -9,12 +9,9 @@ import (
 )
 
 func (r *PostgresRepository) CreateParameterDefinition(ctx context.Context, req models.CreateParameterDefinitionRequest) (*models.ParameterDefinition, error) {
-	node, err := r.getNodeByID(ctx, req.ClassNodeID)
+	_, err := r.getNodeByID(ctx, req.ClassNodeID)
 	if err != nil {
 		return nil, err
-	}
-	if node.NodeType != models.TypeMetaclass {
-		return nil, ErrInvalidParent
 	}
 	if req.Constraints != nil && req.Constraints.MinValue != nil && req.Constraints.MaxValue != nil {
 		if *req.Constraints.MinValue > *req.Constraints.MaxValue {
@@ -197,12 +194,13 @@ func (r *PostgresRepository) DeleteParameterDefinition(ctx context.Context, id i
 }
 
 func (r *PostgresRepository) SetParameterValue(ctx context.Context, req models.CreateParameterValueRequest) (*models.ParameterValue, error) {
-	node, err := r.getNodeByID(ctx, req.ProductNodeID)
+	var product models.Product
+	err := r.db.QueryRowContext(ctx, `SELECT id, class_node_id FROM products WHERE id = $1`, req.ProductID).Scan(&product.ID, &product.ClassNodeID)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
 	if err != nil {
 		return nil, err
-	}
-	if node.NodeType != models.TypeLeaf {
-		return nil, errors.New("only leaf nodes can have parameter values")
 	}
 
 	param, err := r.GetParameterDefinition(ctx, req.ParamDefID)
@@ -210,7 +208,7 @@ func (r *PostgresRepository) SetParameterValue(ctx context.Context, req models.C
 		return nil, err
 	}
 
-	isAncestor, err := r.isAncestor(ctx, param.ClassNodeID, req.ProductNodeID)
+	isAncestor, err := r.isAncestor(ctx, param.ClassNodeID, product.ClassNodeID)
 	if err != nil {
 		return nil, err
 	}
@@ -242,19 +240,20 @@ func (r *PostgresRepository) SetParameterValue(ctx context.Context, req models.C
 	}
 
 	query := `
-        INSERT INTO parameter_values (product_node_id, param_def_id, value_numeric, value_enum_id)
+        INSERT INTO parameter_values (product_id, param_def_id, value_numeric, value_enum_id)
         VALUES ($1, $2, $3, $4)
-        ON CONFLICT (product_node_id, param_def_id) DO UPDATE SET
+        ON CONFLICT (product_id, param_def_id) DO UPDATE SET
             value_numeric = EXCLUDED.value_numeric,
             value_enum_id = EXCLUDED.value_enum_id,
             updated_at = now()
-        RETURNING id, product_node_id, param_def_id, value_numeric, value_enum_id, created_at, updated_at
+        RETURNING id, product_id, param_def_id, value_numeric, value_enum_id, created_at, updated_at
     `
+
 	var pv models.ParameterValue
 	err = r.db.QueryRowContext(ctx, query,
-		req.ProductNodeID, req.ParamDefID, req.ValueNumeric, req.ValueEnumID,
+		req.ProductID, req.ParamDefID, req.ValueNumeric, req.ValueEnumID,
 	).Scan(
-		&pv.ID, &pv.ProductNodeID, &pv.ParamDefID, &pv.ValueNumeric, &pv.ValueEnumID,
+		&pv.ID, &pv.ProductID, &pv.ParamDefID, &pv.ValueNumeric, &pv.ValueEnumID,
 		&pv.CreatedAt, &pv.UpdatedAt,
 	)
 	if err != nil {
@@ -263,12 +262,12 @@ func (r *PostgresRepository) SetParameterValue(ctx context.Context, req models.C
 	return &pv, nil
 }
 
-func (r *PostgresRepository) GetParameterValuesForProduct(ctx context.Context, productNodeID int) ([]*models.ParameterValue, error) {
+func (r *PostgresRepository) GetParameterValuesForProduct(ctx context.Context, productID int) ([]*models.ParameterValue, error) {
 	rows, err := r.db.QueryContext(ctx, `
-        SELECT id, product_node_id, param_def_id, value_numeric, value_enum_id, created_at, updated_at
+        SELECT id, product_id, param_def_id, value_numeric, value_enum_id, created_at, updated_at
         FROM parameter_values
-        WHERE product_node_id = $1
-    `, productNodeID)
+        WHERE product_id = $1
+    `, productID)
 	if err != nil {
 		return nil, err
 	}
@@ -277,7 +276,7 @@ func (r *PostgresRepository) GetParameterValuesForProduct(ctx context.Context, p
 	var values []*models.ParameterValue
 	for rows.Next() {
 		var v models.ParameterValue
-		if err := rows.Scan(&v.ID, &v.ProductNodeID, &v.ParamDefID, &v.ValueNumeric, &v.ValueEnumID, &v.CreatedAt, &v.UpdatedAt); err != nil {
+		if err := rows.Scan(&v.ID, &v.ProductID, &v.ParamDefID, &v.ValueNumeric, &v.ValueEnumID, &v.CreatedAt, &v.UpdatedAt); err != nil {
 			return nil, err
 		}
 		values = append(values, &v)
@@ -333,15 +332,15 @@ func (r *PostgresRepository) GetParameterConstraints(ctx context.Context, paramD
 func (r *PostgresRepository) isAncestor(ctx context.Context, ancestorID, nodeID int) (bool, error) {
 	var count int
 	err := r.db.QueryRowContext(ctx, `
-        WITH RECURSIVE ancestors AS (
-            SELECT id FROM classifier_nodes WHERE id = $1
-            UNION ALL
-            SELECT parent_id FROM classifier_nodes n
-            INNER JOIN ancestors a ON n.id = a.id
-            WHERE n.parent_id IS NOT NULL
-        )
-        SELECT COUNT(*) FROM ancestors WHERE id = $2
-    `, nodeID, ancestorID).Scan(&count)
+		WITH RECURSIVE ancestors AS (
+			SELECT id FROM classifier_nodes WHERE id = $1
+			UNION ALL
+			SELECT parent_id FROM classifier_nodes n
+			INNER JOIN ancestors a ON n.id = a.id
+			WHERE n.parent_id IS NOT NULL
+		)
+		SELECT COUNT(*) FROM ancestors WHERE id = $2
+	`, nodeID, ancestorID).Scan(&count)
 	if err != nil {
 		return false, err
 	}

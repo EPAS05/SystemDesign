@@ -45,3 +45,7 @@ func readID(reader *bufio.Reader) *int {
 	}
 	return &id
 }
+
+func boolPtr(b bool) *bool {
+	return &b
+}

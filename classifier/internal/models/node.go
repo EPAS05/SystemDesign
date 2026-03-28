@@ -6,22 +6,13 @@ import (
 
 type NodeType string
 
-const (
-	TypeMetaclass NodeType = "metaclass"
-	TypeLeaf      NodeType = "leaf"
-	TypeEnum      NodeType = "enum"
-)
-
 type Node struct {
 	ID         int       `db:"id"`
 	Name       string    `db:"name"`
 	ParentID   *int      `db:"parent_id"`
-	NodeType   NodeType  `db:"node_type"`
 	IsTerminal *bool     `db:"is_terminal"`
 	UnitID     *int      `db:"unit_id"`
 	SortOrder  int       `db:"sort_order"`
-	ObjectType *string   `db:"object_type"`
-	ObjectID   *int      `db:"object_id"`
 	CreatedAt  time.Time `db:"created_at"`
 	UpdatedAt  time.Time `db:"updated_at"`
 }
@@ -29,12 +20,9 @@ type Node struct {
 type CreateNodeRequest struct {
 	Name       string
 	ParentID   *int
-	NodeType   NodeType
 	IsTerminal *bool
 	UnitID     *int
 	SortOrder  *int
-	ObjectType *string
-	ObjectID   *int
 }
 
 type SetNameRequest struct {

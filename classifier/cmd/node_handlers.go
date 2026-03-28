@@ -7,7 +7,6 @@ import (
 	"context"
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -29,32 +28,30 @@ func nodeMenu(repo repository.Repository, reader *bufio.Reader) {
 		fmt.Print("Выбор: ")
 
 		choice := readLine(reader)
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
-		defer cancel()
 
 		switch choice {
 		case "1":
-			createNode(ctx, repo, reader)
+			createNode(repo, reader)
 		case "2":
-			getNode(ctx, repo, reader)
+			getNode(repo, reader)
 		case "3":
-			listChildren(ctx, repo, reader)
+			listChildren(repo, reader)
 		case "4":
-			listDescendants(ctx, repo, reader)
+			listDescendants(repo, reader)
 		case "5":
-			listAncestors(ctx, repo, reader)
+			listAncestors(repo, reader)
 		case "6":
-			getParent(ctx, repo, reader)
+			getParent(repo, reader)
 		case "7":
-			moveNode(ctx, repo, reader)
+			moveNode(repo, reader)
 		case "8":
-			renameNode(ctx, repo, reader)
+			renameNode(repo, reader)
 		case "9":
-			setNodeOrder(ctx, repo, reader)
+			setNodeOrder(repo, reader)
 		case "10":
-			deleteNode(ctx, repo, reader)
+			deleteNode(repo, reader)
 		case "11":
-			showAllTerminalDesc(ctx, repo, reader)
+			showAllTerminalDesc(repo, reader)
 		case "12":
 			return
 		default:
@@ -63,20 +60,9 @@ func nodeMenu(repo repository.Repository, reader *bufio.Reader) {
 	}
 }
 
-func createNode(ctx context.Context, repo repository.Repository, reader *bufio.Reader) {
+func createNode(repo repository.Repository, reader *bufio.Reader) {
 	fmt.Print("Введите имя узла: ")
 	name := readLine(reader)
-
-	fmt.Print("Тип узла (metaclass/leaf): ")
-	typeStr := readLine(reader)
-	nodeType := models.NodeType(typeStr)
-
-	if nodeType == models.TypeEnum {
-		fmt.Println("Перечисления создаются через меню перечислений.")
-		return
-	}
-
-	var isTerminal *bool
 
 	fmt.Print("ID родителя (Оставьте пустым для корня): ")
 	parentStr := readLine(reader)
@@ -90,7 +76,9 @@ func createNode(ctx context.Context, repo repository.Repository, reader *bufio.R
 		parentID = &pid
 	}
 
-	units, err := repo.GetAllUnits(ctx)
+	ctxUnits, cancelUnits := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancelUnits()
+	units, err := repo.GetAllUnits(ctxUnits)
 	if err != nil {
 		fmt.Printf("Ошибка получения ЕИ: %v\n", err)
 	} else if len(units) > 0 {
@@ -124,83 +112,15 @@ func createNode(ctx context.Context, repo repository.Repository, reader *bufio.R
 		sortOrder = &order
 	}
 
-	var objectType *string
-	var objectID *int
-
-	if nodeType == models.TypeLeaf {
-		fmt.Print("Тип единицы (mass/length/piece): ")
-		ut := strings.ToLower(readLine(reader))
-		var unitType *string
-		if ut == "mass" || ut == "length" || ut == "piece" {
-			unitType = &ut
-		} else {
-			fmt.Println("Неверный тип, оставляем пустым.")
-		}
-
-		fmt.Print("Вес погонного метра (т/м): ")
-		wStr := readLine(reader)
-		var weightPerMeter *float64
-		if wStr != "" {
-			w, err := strconv.ParseFloat(wStr, 64)
-			if err == nil {
-				weightPerMeter = &w
-			} else {
-				fmt.Println("Неверное число, оставляем пустым.")
-			}
-		}
-
-		fmt.Print("Длина одной штуки (м): ")
-		pStr := readLine(reader)
-		var pieceLength *float64
-		if pStr != "" {
-			p, err := strconv.ParseFloat(pStr, 64)
-			if err == nil {
-				pieceLength = &p
-			} else {
-				fmt.Println("Неверное число, оставляем пустым.")
-			}
-		}
-
-		fmt.Print("ID единицы измерения по умолчанию (оставьте пустым, если не задана): ")
-		defStr := readLine(reader)
-		var defaultUnitID *int
-		if defStr != "" {
-			defID, err := strconv.Atoi(defStr)
-			if err == nil {
-				defaultUnitID = &defID
-			} else {
-				fmt.Println("Неверный ID, оставляем пустым.")
-			}
-		}
-
-		prodReq := models.CreateProductRequest{
-			UnitType:       unitType,
-			WeightPerMeter: weightPerMeter,
-			PieceLength:    pieceLength,
-			DefaultUnitID:  defaultUnitID,
-		}
-		product, err := repo.CreateProduct(ctx, prodReq)
-		if err != nil {
-			fmt.Printf("Ошибка создания продукта: %v\n", err)
-			return
-		}
-		objectType := new(string)
-		*objectType = "product"
-		objectID = &product.ID
-		fmt.Printf("Продукт создан с ID: %d\n", product.ID)
-	}
-
 	req := models.CreateNodeRequest{
-		Name:       name,
-		ParentID:   parentID,
-		NodeType:   nodeType,
-		IsTerminal: isTerminal,
-		UnitID:     unitID,
-		SortOrder:  sortOrder,
-		ObjectType: objectType,
-		ObjectID:   objectID,
+		Name:      name,
+		ParentID:  parentID,
+		UnitID:    unitID,
+		SortOrder: sortOrder,
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 	node, err := repo.CreateNode(ctx, req)
 	if err != nil {
 		fmt.Printf("Ошибка создания узла: %v\n", err)
@@ -209,31 +129,31 @@ func createNode(ctx context.Context, repo repository.Repository, reader *bufio.R
 	fmt.Printf("Узел создан с ID: %d\n", node.ID)
 }
 
-func getNode(ctx context.Context, repo repository.Repository, reader *bufio.Reader) {
+func getNode(repo repository.Repository, reader *bufio.Reader) {
 	id := readID(reader)
 	if id == nil {
 		return
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 	node, err := repo.GetNode(ctx, *id)
 	if err != nil {
-		fmt.Printf("Error: %v\n", err)
+		fmt.Printf("Ошибка: %v\n", err)
 		return
 	}
 	printNode(node)
-	if node.NodeType == models.TypeLeaf {
-		fmt.Println("\nПараметры изделия:")
-		showProductParameters(ctx, repo, *id)
-	}
 }
 
-func listChildren(ctx context.Context, repo repository.Repository, reader *bufio.Reader) {
+func listChildren(repo repository.Repository, reader *bufio.Reader) {
 	id := readID(reader)
 	if id == nil {
 		return
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 	children, err := repo.GetChildren(ctx, *id)
 	if err != nil {
-		fmt.Printf("Error: %v\n", err)
+		fmt.Printf("Ошибка: %v\n", err)
 		return
 	}
 	if len(children) == 0 {
@@ -246,14 +166,16 @@ func listChildren(ctx context.Context, repo repository.Repository, reader *bufio
 	}
 }
 
-func listDescendants(ctx context.Context, repo repository.Repository, reader *bufio.Reader) {
+func listDescendants(repo repository.Repository, reader *bufio.Reader) {
 	id := readID(reader)
 	if id == nil {
 		return
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 	descendants, err := repo.GetAllDescendants(ctx, *id)
 	if err != nil {
-		fmt.Printf("Error: %v\n", err)
+		fmt.Printf("Ошибка: %v\n", err)
 		return
 	}
 	if len(descendants) == 0 {
@@ -266,14 +188,16 @@ func listDescendants(ctx context.Context, repo repository.Repository, reader *bu
 	}
 }
 
-func listAncestors(ctx context.Context, repo repository.Repository, reader *bufio.Reader) {
+func listAncestors(repo repository.Repository, reader *bufio.Reader) {
 	id := readID(reader)
 	if id == nil {
 		return
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 	ancestors, err := repo.GetAllAncestors(ctx, *id)
 	if err != nil {
-		fmt.Printf("Error: %v\n", err)
+		fmt.Printf("Ошибка: %v\n", err)
 		return
 	}
 	if len(ancestors) == 0 {
@@ -286,14 +210,16 @@ func listAncestors(ctx context.Context, repo repository.Repository, reader *bufi
 	}
 }
 
-func getParent(ctx context.Context, repo repository.Repository, reader *bufio.Reader) {
+func getParent(repo repository.Repository, reader *bufio.Reader) {
 	id := readID(reader)
 	if id == nil {
 		return
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 	parent, err := repo.GetParent(ctx, *id)
 	if err != nil {
-		fmt.Printf("Error: %v\n", err)
+		fmt.Printf("Ошибка: %v\n", err)
 		return
 	}
 	if parent == nil {
@@ -303,7 +229,7 @@ func getParent(ctx context.Context, repo repository.Repository, reader *bufio.Re
 	printNode(parent)
 }
 
-func moveNode(ctx context.Context, repo repository.Repository, reader *bufio.Reader) {
+func moveNode(repo repository.Repository, reader *bufio.Reader) {
 	id := readID(reader)
 	if id == nil {
 		return
@@ -323,15 +249,17 @@ func moveNode(ctx context.Context, repo repository.Repository, reader *bufio.Rea
 		NodeId:      *id,
 		NewParentID: newParentID,
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 	err := repo.SetParent(ctx, req)
 	if err != nil {
-		fmt.Printf("Error: %v\n", err)
+		fmt.Printf("Ошибка: %v\n", err)
 		return
 	}
-	fmt.Println("Узел подвинут.")
+	fmt.Println("Узел перемещён.")
 }
 
-func renameNode(ctx context.Context, repo repository.Repository, reader *bufio.Reader) {
+func renameNode(repo repository.Repository, reader *bufio.Reader) {
 	id := readID(reader)
 	if id == nil {
 		return
@@ -342,15 +270,17 @@ func renameNode(ctx context.Context, repo repository.Repository, reader *bufio.R
 		NodeId: *id,
 		Name:   name,
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 	err := repo.SetName(ctx, req)
 	if err != nil {
-		fmt.Printf("Error: %v\n", err)
+		fmt.Printf("Ошибка: %v\n", err)
 		return
 	}
 	fmt.Println("Узел переименован.")
 }
 
-func setNodeOrder(ctx context.Context, repo repository.Repository, reader *bufio.Reader) {
+func setNodeOrder(repo repository.Repository, reader *bufio.Reader) {
 	id := readID(reader)
 	if id == nil {
 		return
@@ -362,15 +292,17 @@ func setNodeOrder(ctx context.Context, repo repository.Repository, reader *bufio
 		fmt.Println("Неправильно (введите число).")
 		return
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 	err = repo.SetNodeOrder(ctx, *id, order)
 	if err != nil {
-		fmt.Printf("Error: %v\n", err)
+		fmt.Printf("Ошибка: %v\n", err)
 		return
 	}
-	fmt.Println("Порядок изменен.")
+	fmt.Println("Порядок изменён.")
 }
 
-func deleteNode(ctx context.Context, repo repository.Repository, reader *bufio.Reader) {
+func deleteNode(repo repository.Repository, reader *bufio.Reader) {
 	id := readID(reader)
 	if id == nil {
 		return
@@ -381,19 +313,23 @@ func deleteNode(ctx context.Context, repo repository.Repository, reader *bufio.R
 		fmt.Println("Удаление отменено.")
 		return
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 	err := repo.DeleteNode(ctx, *id)
 	if err != nil {
-		fmt.Printf("Error: %v\n", err)
+		fmt.Printf("Ошибка: %v\n", err)
 		return
 	}
-	fmt.Println("Узел удален.")
+	fmt.Println("Узел удалён.")
 }
 
-func showAllTerminalDesc(ctx context.Context, repo repository.Repository, reader *bufio.Reader) {
+func showAllTerminalDesc(repo repository.Repository, reader *bufio.Reader) {
 	id := readID(reader)
 	if id == nil {
 		return
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 	terminals, err := repo.GetAllTerminalDescendants(ctx, *id)
 	if err != nil {
 		fmt.Printf("Ошибка: %v\n", err)
@@ -411,50 +347,13 @@ func showAllTerminalDesc(ctx context.Context, repo repository.Repository, reader
 
 func printNode(node *models.Node) {
 	term := ""
-	if node.NodeType == models.TypeMetaclass && node.IsTerminal != nil {
-		term = fmt.Sprintf(", Терминальный: %v", *node.IsTerminal)
+	if node.IsTerminal != nil {
+		term = fmt.Sprintf(", терминальный: %v", *node.IsTerminal)
 	}
 	unit := ""
 	if node.UnitID != nil {
 		unit = fmt.Sprintf(", ID ЕИ: %d", *node.UnitID)
 	}
-	obj := ""
-	if node.ObjectType != nil && node.ObjectID != nil {
-		obj = fmt.Sprintf(", объект: %s:%d", *node.ObjectType, *node.ObjectID)
-	}
-	fmt.Printf("ID: %d, название: %s, тип: %s%s%s, порядок: %d%s\n",
-		node.ID, node.Name, node.NodeType, term, unit, node.SortOrder, obj)
-}
-
-func showProductParameters(ctx context.Context, repo repository.Repository, productID int) {
-	values, err := repo.GetParameterValuesForProduct(ctx, productID)
-	if err != nil {
-		fmt.Printf("Ошибка получения параметров: %v\n", err)
-		return
-	}
-	if len(values) == 0 {
-		fmt.Println("  нет значений")
-		return
-	}
-	for _, v := range values {
-		param, err := repo.GetParameterDefinition(ctx, v.ParamDefID)
-		if err != nil {
-			continue
-		}
-		if param.ParameterType == "number" && v.ValueNumeric != nil {
-			unitStr := ""
-			if param.UnitID != nil {
-				unit, err := repo.GetUnit(ctx, *param.UnitID)
-				if err == nil {
-					unitStr = fmt.Sprintf(" %s", unit.Name)
-				}
-			}
-			fmt.Printf("  %s: %.2f%s\n", param.Name, *v.ValueNumeric, unitStr)
-		} else if param.ParameterType == "enum" && v.ValueEnumID != nil {
-			enumVal, err := repo.GetEnumValue(ctx, *v.ValueEnumID)
-			if err == nil {
-				fmt.Printf("  %s: %s\n", param.Name, enumVal.Value)
-			}
-		}
-	}
+	fmt.Printf("ID: %d, название: %s, порядок: %d%s%s\n",
+		node.ID, node.Name, node.SortOrder, term, unit)
 }
