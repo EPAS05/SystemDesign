@@ -1,7 +1,7 @@
 services:
   db:
     image: postgres:18-alpine
-    container_name: postgres_db
+    container_name: postgres_classifier_db
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${DB_USER:-classifier}
@@ -29,6 +29,25 @@ services:
       DB_NAME: ${DB_NAME:-classifier}
     stdin_open: true
     tty: true
+    networks:
+      - classifier_net
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: classifier_api
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-classifier}
+      DB_PASSWORD: ${DB_PASSWORD:-secret}
+      DB_NAME: ${DB_NAME:-classifier}
+    ports:
+      - "8080:8080"
     networks:
       - classifier_net
 

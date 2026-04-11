@@ -1,25 +1,12 @@
-package main
+package cli_handlers
 
 import (
 	"bufio"
-	"classifier/internal/db"
 	"classifier/internal/repository"
 	"fmt"
-	"os"
 )
 
-func main() {
-	connStr := getDBConnStr()
-	database, err := db.NewConnection(connStr)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to connect to database: %v\n", err)
-		os.Exit(1)
-	}
-	defer database.Close()
-
-	repo := repository.NewPostgresRepository(database)
-	reader := bufio.NewReader(os.Stdin)
-
+func StartCLI(repo repository.Repository, reader *bufio.Reader) {
 	for {
 		fmt.Println("\n=== Главное меню ===")
 		fmt.Println("1. Операции с узлами")

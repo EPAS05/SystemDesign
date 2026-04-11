@@ -7,8 +7,8 @@ RUN go mod download
 
 COPY . .
 
-WORKDIR /app/cmd/cli
-RUN CGO_ENABLED=0 GOOS=linux go build -o classifier .
+WORKDIR /app/cmd/api
+RUN CGO_ENABLED=0 GOOS=linux go build -o classifier-api .
 
 FROM alpine:latest
 
@@ -16,8 +16,10 @@ RUN apk --no-cache add ca-certificates
 
 WORKDIR /root/
 
-COPY --from=builder /app/cmd/cli/classifier .
+COPY --from=builder /app/cmd/api/classifier-api .
 
 COPY --from=builder /app/sql ./sql
 
-CMD [ "./classifier" ]
+EXPOSE 8080
+
+CMD [ "./classifier-api" ]

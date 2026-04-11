@@ -4,8 +4,6 @@ import (
 	"time"
 )
 
-type NodeType string
-
 type Node struct {
 	ID         int       `db:"id"`
 	Name       string    `db:"name"`

@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS parameter_constraints (
 
 CREATE TABLE IF NOT EXISTS parameter_values (
     id              SERIAL PRIMARY KEY,
-    product_id      INTEGER NOT NULL REFERENCES classifier_nodes(id) ON DELETE CASCADE,
+    product_id      INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
     param_def_id    INTEGER NOT NULL REFERENCES parameter_definitions(id) ON DELETE CASCADE,
     value_numeric   DOUBLE PRECISION,
     value_enum_id   INTEGER REFERENCES enum_values(id) ON DELETE SET NULL,
