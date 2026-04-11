@@ -1,0 +1,140 @@
+curl -X POST http://localhost:8080/api/nodes -H "Content-Type: application/json" -d "{"name":"Балки","parent_id":2}"
+expected: {"id":7,"name":"Балки","parent_id":2,"is_terminal":null,"unit_id":null,"sort_order":0,"created_at":"...","updated_at":"..."}
+
+curl -X POST http://localhost:8080/api/nodes -H "Content-Type: application/json" -d "{"name":"Двутавровые балки","parent_id":7}"
+expected: {"id":8,"name":"Двутавровые балки","parent_id":7,"is_terminal":null,"unit_id":null,"sort_order":0,"created_at":"...","updated_at":"..."}
+
+curl http://localhost:8080/api/nodes/7
+expected: Данные узла 7 (например, {"ID":7,"Name":"Балки","ParentID":2,"IsTerminal":false,...})
+
+curl http://localhost:8080/api/nodes/7/children
+expected: [{"ID":8,"Name":"Двутавровые балки","ParentID":7,...}]
+
+curl http://localhost:8080/api/nodes/2/descendants
+expected: Массив всех потомков узла 2 (включая 7, 8 и т.д.)
+
+curl http://localhost:8080/api/nodes/8/ancestors
+expected: Массив предков (узлы 7 и 2)
+
+curl http://localhost:8080/api/nodes/8/parent
+expected: Данные узла 7
+
+curl -X PUT http://localhost:8080/api/nodes/8/parent -H "Content-Type: application/json" -d "{"new_parent_id":2}"
+expected: {"status":"ok"}
+
+curl -X PUT http://localhost:8080/api/nodes/8/name -H "Content-Type: application/json" -d "{"name":"Швеллеры"}"
+expected: {"status":"ok"}
+
+curl -X PUT http://localhost:8080/api/nodes/7/order -H "Content-Type: application/json" -d "{"order":5}"
+expected: {"status":"ok"}
+
+curl -X POST http://localhost:8080/api/units -H "Content-Type: application/json" -d "{"name":"килограмм","multiplier":0.001}"
+expected: {"id":9,"name":"килограмм","multiplier":0.001,"created_at":"...","updated_at":"..."}
+
+curl http://localhost:8080/api/units
+expected: Массив всех единиц (включая созданные)
+
+curl http://localhost:8080/api/units/9
+expected: {"ID":9,"Name":"килограмм","Multiplier":0.001,...}
+
+curl -X PUT http://localhost:8080/api/units/9 -H "Content-Type: application/json" -d "{"name":"кг","multiplier":0.001}"
+expected: {"status":"ok"}
+
+curl -X DELETE http://localhost:8080/api/units/9
+expected: {"status":"ok"}
+
+curl -X POST http://localhost:8080/api/enums -H "Content-Type: application/json" -d "{"name":"Тип балки","description":"Типы","type_node_id":5}"
+expected: {"id":1,"name":"Тип балки","description":"Типы","type_node_id":5,"created_at":"...","updated_at":"..."}
+
+curl -X POST http://localhost:8080/api/enums/1/values -H "Content-Type: application/json" -d "{"value":"Двутавровая"}"
+expected: {"id":1,"enum_id":1,"value":"Двутавровая","sort_order":0,"created_at":"...","updated_at":"..."}
+
+curl -X POST http://localhost:8080/api/enums/1/values -H "Content-Type: application/json" -d "{"value":"Швеллер"}"
+expected: {"id":2,"enum_id":1,"value":"Швеллер","sort_order":1,...}
+
+curl -X POST http://localhost:8080/api/enums/1/values -H "Content-Type: application/json" -d "{"value":"Уголок"}"
+expected: {"id":3,"enum_id":1,"value":"Уголок","sort_order":2,...}
+
+curl http://localhost:8080/api/enums/1/values
+expected: Массив из трёх значений (сортируются по sort_order)
+
+curl -X PUT http://localhost:8080/api/enums/values/2 -H "Content-Type: application/json" -d "{"value":"Швеллер горячекатаный"}"
+expected: {"status":"ok"}
+
+curl -X POST http://localhost:8080/api/enums/1/values/reorder -H "Content-Type: application/json" -d "{"value_ids":[3,1,2]}"
+expected: {"status":"ok"}
+
+curl -X DELETE http://localhost:8080/api/enums/values/3
+expected: {"status":"ok"}
+
+curl -X PUT http://localhost:8080/api/enums/1 -H "Content-Type: application/json" -d "{"name":"Тип профиля","description":"Типы металлопрофиля"}"
+expected: {"status":"ok"}
+
+curl -X DELETE http://localhost:8080/api/enums/1
+expected: {"status":"ok"}
+
+curl -X POST http://localhost:8080/api/products -H "Content-Type: application/json" -d "{"name":"Балка 20Б1","class_node_id":8,"unit_type":"mass","weight_per_meter":0.021,"piece_length":12}"
+expected: {"id":1,"name":"Балка 20Б1","class_node_id":8,"unit_type":"mass","weight_per_meter":0.021,"piece_length":12,"default_unit_id":null,"created_at":"...","updated_at":"..."}
+
+curl http://localhost:8080/api/nodes/8
+expected: Узел 8 теперь имеет "IsTerminal": true
+
+curl -X POST http://localhost:8080/api/nodes -H "Content-Type: application/json" -d "{"name":"Подкласс","parent_id":8}"
+expected: Ошибка 400 (класс терминальный)
+
+curl http://localhost:8080/api/nodes/8/products
+expected: [{"ID":1,"Name":"Балка 20Б1",...}]
+
+curl http://localhost:8080/api/products/1
+expected: Данные продукта (как при создании)
+
+curl -X PUT http://localhost:8080/api/products/1 -H "Content-Type: application/json" -d "{"name":"Балка 20Б1 усиленная","class_node_id":8,"unit_type":"mass","weight_per_meter":0.022}"
+expected: {"status":"ok"}
+
+curl -X DELETE http://localhost:8080/api/products/1
+expected: {"status":"ok"} (после удаления последнего продукта узел 8 становится нетерминальным: "IsTerminal": null)
+
+curl -X POST http://localhost:8080/api/nodes -H "Content-Type: application/json" -d "{"name":"Прокат","parent_id":2}"
+expected: {"id":9,"name":"Прокат","parent_id":2,"is_terminal":null,"unit_id":null,"sort_order":6,...}
+
+curl -X POST http://localhost:8080/api/nodes/9/parameter-definitions -H "Content-Type: application/json" -d "{"name":"Длина","parameter_type":"number","unit_id":1,"is_required":true,"constraints":{"min_value":0,"max_value":1000}}"
+expected: {"id":1,"class_node_id":9,"name":"Длина","parameter_type":"number","unit_id":1,"enum_id":null,"is_required":true,"sort_order":0,"created_at":"...","updated_at":"..."}
+
+curl -X POST http://localhost:8080/api/enums -H "Content-Type: application/json" -d "{"name":"Тип балки","type_node_id":5}"
+expected: {"id":2,"name":"Тип балки","type_node_id":5,"created_at":"...","updated_at":"..."}
+
+curl -X POST http://localhost:8080/api/enums/2/values -H "Content-Type: application/json" -d "{"value":"Двутавровая"}"
+expected: {"id":4,"enum_id":2,"value":"Двутавровая","sort_order":0,...}
+
+curl -X POST http://localhost:8080/api/nodes/9/parameter-definitions -H "Content-Type: application/json" -d "{"name":"Тип","parameter_type":"enum","enum_id":2,"is_required":true}"
+expected: {"id":2,"class_node_id":9,"name":"Тип","parameter_type":"enum","enum_id":2,"is_required":true,"sort_order":1,"created_at":"...","updated_at":"..."}
+
+curl http://localhost:8080/api/nodes/9/parameter-definitions
+expected: Массив из двух параметров (Длина и Тип)
+
+curl http://localhost:8080/api/parameter-definitions/1
+expected: Данные параметра «Длина»
+
+curl -X PUT http://localhost:8080/api/parameter-definitions/1 -H "Content-Type: application/json" -d "{"name":"Длина","is_required":false}"
+expected: {"status":"ok"}
+
+curl -X DELETE http://localhost:8080/api/parameter-definitions/2
+expected: {"status":"ok"}
+
+curl -X POST http://localhost:8080/api/products -H "Content-Type: application/json" -d "{"name":"Балка 30","class_node_id":9}"
+expected: {"id":2,"name":"Балка 30","class_node_id":9,"unit_type":null,...}
+
+curl -X POST http://localhost:8080/api/products/2/parameter-values -H "Content-Type: application/json" -d "{"param_def_id":1,"value_numeric":6.5}"
+expected: {"id":1,"product_id":2,"param_def_id":1,"value_numeric":6.5,"value_enum_id":null,"created_at":"...","updated_at":"..."}
+
+curl -X POST http://localhost:8080/api/products/2/parameter-values -H "Content-Type: application/json" -d "{"param_def_id":2,"value_enum_id":4}"
+expected: {"id":2,"product_id":2,"param_def_id":2,"value_enum_id":4,...}
+
+curl http://localhost:8080/api/products/2/parameter-values
+expected: Массив из двух значений
+
+curl -X PUT http://localhost:8080/api/parameter-values/1 -H "Content-Type: application/json" -d "{"value_numeric":7.2}"
+expected: {"status":"ok"}
+
+curl -X DELETE http://localhost:8080/api/parameter-values/1
+expected: {"status":"ok"}

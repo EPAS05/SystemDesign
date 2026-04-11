@@ -97,17 +97,13 @@ func (h *ParameterHandler) CreateParameterDefinition(w http.ResponseWriter, r *h
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	node, err := h.NodeRepo.GetNode(ctx, nodeID)
+	_, err = h.NodeRepo.GetNode(ctx, nodeID)
 	if err != nil {
 		if err == repository.ErrNotFound {
 			http.Error(w, "Node not found", http.StatusNotFound)
 		} else {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
-		return
-	}
-	if node.IsTerminal != nil && *node.IsTerminal {
-		http.Error(w, "Terminal node cannot have parameter definitions", http.StatusBadRequest)
 		return
 	}
 
