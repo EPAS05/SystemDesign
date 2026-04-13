@@ -4,8 +4,12 @@ import (
 	"classifier/internal/models"
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
+	"strconv"
+	"strings"
 )
 
 func (r *PostgresRepository) CreateParameterDefinition(ctx context.Context, req models.CreateParameterDefinitionRequest) (*models.ParameterDefinition, error) {
@@ -347,6 +351,204 @@ func (r *PostgresRepository) isAncestor(ctx context.Context, ancestorID, nodeID 
 	return count > 0, nil
 }
 
-func (r *PostgresRepository) FindProductsByParameters(ctx context.Context, classNodeID int, filters []models.ParameterFilter) ([]*models.Node, error) {
-	return nil, nil
+func (r *PostgresRepository) FindProductsByParameters(ctx context.Context, classNodeID int, filters []models.ParameterFilter) ([]*models.Product, error) {
+	if classNodeID <= 0 {
+		return nil, fmt.Errorf("class node id must be greater than zero")
+	}
+
+	if _, err := r.getNodeByID(ctx, classNodeID); err != nil {
+		return nil, err
+	}
+
+	var queryBuilder strings.Builder
+	queryBuilder.WriteString(`
+		SELECT DISTINCT p.id, p.name, p.class_node_id, p.unit_type, p.weight_per_meter, p.piece_length, p.default_unit_id, p.created_at, p.updated_at
+		FROM products p
+	`)
+
+	args := []interface{}{classNodeID}
+	nextArgPos := 2
+
+	for i, filter := range filters {
+		if filter.ParamDefID <= 0 {
+			return nil, fmt.Errorf("invalid param_def_id in filter %d", i)
+		}
+
+		operator := strings.TrimSpace(filter.Operator)
+		if operator == "" {
+			return nil, fmt.Errorf("operator is required in filter %d", i)
+		}
+
+		alias := "pv" + strconv.Itoa(i+1)
+		queryBuilder.WriteString("INNER JOIN parameter_values ")
+		queryBuilder.WriteString(alias)
+		queryBuilder.WriteString(" ON ")
+		queryBuilder.WriteString(alias)
+		queryBuilder.WriteString(".product_id = p.id AND ")
+		queryBuilder.WriteString(alias)
+		queryBuilder.WriteString(".param_def_id = $")
+		queryBuilder.WriteString(strconv.Itoa(nextArgPos))
+		queryBuilder.WriteString(" ")
+		args = append(args, filter.ParamDefID)
+		nextArgPos++
+
+		switch operator {
+		case "=":
+			if enumValueID, ok := parseIntFilterValue(filter.Value); ok {
+				queryBuilder.WriteString("AND ")
+				queryBuilder.WriteString(alias)
+				queryBuilder.WriteString(".value_enum_id = $")
+				queryBuilder.WriteString(strconv.Itoa(nextArgPos))
+				queryBuilder.WriteString(" ")
+				args = append(args, enumValueID)
+				nextArgPos++
+				continue
+			}
+
+			numericValue, ok := parseFloatFilterValue(filter.Value)
+			if !ok {
+				return nil, fmt.Errorf("unsupported '=' value for filter %d", i)
+			}
+			queryBuilder.WriteString("AND ")
+			queryBuilder.WriteString(alias)
+			queryBuilder.WriteString(".value_numeric = $")
+			queryBuilder.WriteString(strconv.Itoa(nextArgPos))
+			queryBuilder.WriteString(" ")
+			args = append(args, numericValue)
+			nextArgPos++
+		case "<", ">", "<=", ">=":
+			numericValue, ok := parseFloatFilterValue(filter.Value)
+			if !ok {
+				return nil, fmt.Errorf("operator %q requires numeric value in filter %d", operator, i)
+			}
+			queryBuilder.WriteString("AND ")
+			queryBuilder.WriteString(alias)
+			queryBuilder.WriteString(".value_numeric IS NOT NULL AND ")
+			queryBuilder.WriteString(alias)
+			queryBuilder.WriteString(".value_numeric ")
+			queryBuilder.WriteString(operator)
+			queryBuilder.WriteString(" $")
+			queryBuilder.WriteString(strconv.Itoa(nextArgPos))
+			queryBuilder.WriteString(" ")
+			args = append(args, numericValue)
+			nextArgPos++
+		default:
+			return nil, fmt.Errorf("unsupported operator %q in filter %d", operator, i)
+		}
+	}
+
+	queryBuilder.WriteString("WHERE p.class_node_id = $1 ORDER BY p.name")
+
+	rows, err := r.db.QueryContext(ctx, queryBuilder.String(), args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var products []*models.Product
+	for rows.Next() {
+		var p models.Product
+		if err := rows.Scan(
+			&p.ID,
+			&p.Name,
+			&p.ClassNodeID,
+			&p.UnitType,
+			&p.WeightPerMeter,
+			&p.PieceLength,
+			&p.DefaultUnitID,
+			&p.CreatedAt,
+			&p.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		products = append(products, &p)
+	}
+
+	return products, rows.Err()
+}
+
+func parseFloatFilterValue(value interface{}) (float64, bool) {
+	switch v := value.(type) {
+	case float64:
+		return v, true
+	case float32:
+		return float64(v), true
+	case int:
+		return float64(v), true
+	case int8:
+		return float64(v), true
+	case int16:
+		return float64(v), true
+	case int32:
+		return float64(v), true
+	case int64:
+		return float64(v), true
+	case uint:
+		return float64(v), true
+	case uint8:
+		return float64(v), true
+	case uint16:
+		return float64(v), true
+	case uint32:
+		return float64(v), true
+	case uint64:
+		return float64(v), true
+	case string:
+		number, err := strconv.ParseFloat(v, 64)
+		if err != nil {
+			return 0, false
+		}
+		return number, true
+	default:
+		return 0, false
+	}
+}
+
+func parseIntFilterValue(value interface{}) (int, bool) {
+	switch v := value.(type) {
+	case int:
+		return v, true
+	case int8:
+		return int(v), true
+	case int16:
+		return int(v), true
+	case int32:
+		return int(v), true
+	case int64:
+		return int(v), true
+	case uint:
+		return int(v), true
+	case uint8:
+		return int(v), true
+	case uint16:
+		return int(v), true
+	case uint32:
+		return int(v), true
+	case uint64:
+		return int(v), true
+	case float64:
+		if math.Mod(v, 1) != 0 {
+			return 0, false
+		}
+		return int(v), true
+	case float32:
+		if math.Mod(float64(v), 1) != 0 {
+			return 0, false
+		}
+		return int(v), true
+	case json.Number:
+		number, err := v.Int64()
+		if err != nil {
+			return 0, false
+		}
+		return int(number), true
+	case string:
+		number, err := strconv.Atoi(v)
+		if err != nil {
+			return 0, false
+		}
+		return number, true
+	default:
+		return 0, false
+	}
 }

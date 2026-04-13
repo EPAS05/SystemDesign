@@ -88,6 +88,7 @@ func main() {
 	api.HandleFunc("/products/{product_id:[0-9]+}/parameter-values", parameterHandler.GetParameterValuesForProduct).Methods("GET")
 	api.HandleFunc("/parameter-values/{id:[0-9]+}", parameterHandler.UpdateParameterValue).Methods("PUT")
 	api.HandleFunc("/parameter-values/{id:[0-9]+}", parameterHandler.DeleteParameterValue).Methods("DELETE")
+	api.HandleFunc("/nodes/{node_id:[0-9]+}/products/search", parameterHandler.FindProductsByParameters).Methods("POST")
 
 	log.Println("Server starting on :8080")
 	log.Fatal(http.ListenAndServe(":8080", r))

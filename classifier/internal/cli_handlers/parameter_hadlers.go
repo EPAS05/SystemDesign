@@ -600,11 +600,111 @@ func deleteParameterValue(repo repository.Repository, reader *bufio.Reader) {
 }
 
 func searchProductsByParams(repo repository.Repository, reader *bufio.Reader) {
-	readLine(reader)
-	results, err := repo.FindProductsByParameters(context.Background(), 0, nil)
+	fmt.Print("Введите ID класса изделий: ")
+	classIDStr := readLine(reader)
+	classID, err := strconv.Atoi(classIDStr)
+	if err != nil || classID <= 0 {
+		fmt.Println("Неверный ID класса.")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	paramDefs, err := repo.GetParameterDefinitionsForClass(ctx, classID)
+	if err != nil {
+		fmt.Printf("Ошибка получения параметров класса: %v\n", err)
+		return
+	}
+
+	if len(paramDefs) == 0 {
+		fmt.Println("У класса нет параметров. Выполняется вывод всех изделий этого класса.")
+	} else {
+		fmt.Println("Доступные параметры:")
+		for _, p := range paramDefs {
+			fmt.Printf("  %d: %s (тип: %s)\n", p.ID, p.Name, p.ParameterType)
+		}
+	}
+
+	filters := make([]models.ParameterFilter, 0)
+	for {
+		fmt.Print("Введите ID параметра для фильтра (Enter - завершить): ")
+		paramIDStr := readLine(reader)
+		if paramIDStr == "" {
+			break
+		}
+
+		paramID, err := strconv.Atoi(paramIDStr)
+		if err != nil || paramID <= 0 {
+			fmt.Println("Неверный ID параметра.")
+			continue
+		}
+
+		var selectedParam *models.ParameterDefinition
+		for _, p := range paramDefs {
+			if p.ID == paramID {
+				selectedParam = p
+				break
+			}
+		}
+		if selectedParam == nil {
+			fmt.Println("Параметр не найден среди доступных для этого класса.")
+			continue
+		}
+
+		if selectedParam.ParameterType == "enum" {
+			fmt.Printf("Введите enum value ID для '%s': ", selectedParam.Name)
+			valueStr := readLine(reader)
+			valueID, err := strconv.Atoi(valueStr)
+			if err != nil || valueID <= 0 {
+				fmt.Println("Неверное значение enum value ID.")
+				continue
+			}
+			filters = append(filters, models.ParameterFilter{
+				ParamDefID: paramID,
+				Operator:   "=",
+				Value:      valueID,
+			})
+			continue
+		}
+
+		fmt.Printf("Оператор для '%s' (=, <, >, <=, >=): ", selectedParam.Name)
+		operator := readLine(reader)
+		switch operator {
+		case "=", "<", ">", "<=", ">=":
+		default:
+			fmt.Println("Неподдерживаемый оператор.")
+			continue
+		}
+
+		fmt.Print("Введите числовое значение: ")
+		valueStr := readLine(reader)
+		numericValue, err := strconv.ParseFloat(valueStr, 64)
+		if err != nil {
+			fmt.Println("Неверное числовое значение.")
+			continue
+		}
+
+		filters = append(filters, models.ParameterFilter{
+			ParamDefID: paramID,
+			Operator:   operator,
+			Value:      numericValue,
+		})
+	}
+
+	results, err := repo.FindProductsByParameters(ctx, classID, filters)
 	if err != nil {
 		fmt.Printf("Ошибка поиска: %v\n", err)
 		return
 	}
-	fmt.Printf("Функция поиска изделий по параметрам пока не реализована. Найдено изделий: %d\n", len(results))
+
+	if len(results) == 0 {
+		fmt.Println("Изделия не найдены.")
+		return
+	}
+
+	fmt.Printf("Найдено изделий: %d\n", len(results))
+	for _, product := range results {
+		fmt.Printf("  %d: %s (class_node_id=%d)\n", product.ID, product.Name, product.ClassNodeID)
+	}
 }

@@ -62,7 +62,7 @@ type ParameterRepository interface {
 	UpdateParameterValue(ctx context.Context, req models.UpdateParameterValueRequest) error
 	DeleteParameterValue(ctx context.Context, id int) error
 	GetParameterConstraints(ctx context.Context, paramDefID int) (*models.ParameterConstraint, error)
-	FindProductsByParameters(ctx context.Context, classNodeID int, filters []models.ParameterFilter) ([]*models.Node, error)
+	FindProductsByParameters(ctx context.Context, classNodeID int, filters []models.ParameterFilter) ([]*models.Product, error)
 }
 
 type Repository interface {

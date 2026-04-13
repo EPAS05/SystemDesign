@@ -5,6 +5,7 @@ import (
 	"classifier/internal/repository"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -51,6 +52,10 @@ type SetParameterValueRequest struct {
 type UpdateParameterValueRequest struct {
 	ValueNumeric *float64 `json:"value_numeric,omitempty"`
 	ValueEnumID  *int     `json:"value_enum_id,omitempty"`
+}
+
+type FindProductsByParametersRequest struct {
+	Filters []models.ParameterFilter `json:"filters"`
 }
 
 func (h *ParameterHandler) CreateParameterDefinition(w http.ResponseWriter, r *http.Request) {
@@ -572,4 +577,49 @@ func (h *ParameterHandler) DeleteParameterValue(w http.ResponseWriter, r *http.R
 	}
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+func (h *ParameterHandler) FindProductsByParameters(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	nodeIDStr := vars["node_id"]
+	nodeID, err := strconv.Atoi(nodeIDStr)
+	if err != nil || nodeID <= 0 {
+		http.Error(w, "Invalid node_id", http.StatusBadRequest)
+		return
+	}
+
+	var req FindProductsByParametersRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	for i, filter := range req.Filters {
+		if filter.ParamDefID <= 0 {
+			http.Error(w, fmt.Sprintf("filters[%d].param_def_id must be greater than zero", i), http.StatusBadRequest)
+			return
+		}
+		switch filter.Operator {
+		case "=", "<", ">", "<=", ">=":
+		default:
+			http.Error(w, fmt.Sprintf("filters[%d].operator is not supported", i), http.StatusBadRequest)
+			return
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	products, err := h.ParamRepo.FindProductsByParameters(ctx, nodeID, req.Filters)
+	if err != nil {
+		if err == repository.ErrNotFound {
+			http.Error(w, "Class node not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(products)
 }
