@@ -1,6 +1,6 @@
 COMPOSE := docker compose
 
-.PHONY: help build up down restart logs ps cli api db clean
+.PHONY: help build up down restart logs ps cli cli-up cli-shell api db clean
 
 help:
 	@echo "Available targets:"
@@ -10,7 +10,9 @@ help:
 	@echo "  make restart - Restart stack (down + up)"
 	@echo "  make logs    - Follow logs for all services"
 	@echo "  make ps      - Show running services"
-	@echo "  make cli     - Run CLI app in terminal (interactive)"
+	@echo "  make cli     - Build, start DB, and run CLI app in terminal"
+	@echo "  make cli-up  - Start CLI container in background"
+	@echo "  make cli-shell - Enter running CLI container shell"
 	@echo "  make api     - Build and start only API + DB"
 	@echo "  make db      - Start only DB"
 	@echo "  make clean   - Stop stack and remove volumes"
@@ -33,7 +35,14 @@ ps:
 	$(COMPOSE) ps
 
 cli: build
+	$(COMPOSE) up -d db
 	$(COMPOSE) run --rm app
+
+cli-up: build
+	$(COMPOSE) up -d app
+
+cli-shell:
+	$(COMPOSE) exec app sh
 
 api: build
 	$(COMPOSE) up -d db api
