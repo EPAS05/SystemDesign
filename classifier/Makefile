@@ -21,7 +21,7 @@ build:
 	$(COMPOSE) build
 
 up: build
-	$(COMPOSE) up -d db api
+	$(COMPOSE) up -d --build db api
 
 down:
 	$(COMPOSE) down
@@ -35,11 +35,11 @@ ps:
 	$(COMPOSE) ps
 
 cli: build
-	$(COMPOSE) up -d db
+	$(COMPOSE) up -d --build db
 	$(COMPOSE) run --rm app
 
 cli-up: build
-	$(COMPOSE) up -d app
+	$(COMPOSE) up -d --build app
 
 cli-shell:
 	$(COMPOSE) exec app sh

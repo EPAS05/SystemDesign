@@ -10,6 +10,8 @@ import (
 	"time"
 )
 
+const PRODUCT_NODE_ROOT_ID = 2
+
 func nodeMenu(repo repository.Repository, reader *bufio.Reader) {
 	for {
 		fmt.Println("\n--- Операции с узлами ---")
@@ -73,6 +75,9 @@ func createNode(repo repository.Repository, reader *bufio.Reader) {
 			fmt.Println("Неправильный ID")
 			return
 		}
+		parentID = &pid
+	} else {
+		pid := PRODUCT_NODE_ROOT_ID
 		parentID = &pid
 	}
 
@@ -243,6 +248,9 @@ func moveNode(repo repository.Repository, reader *bufio.Reader) {
 			fmt.Println("Неправильный ID.")
 			return
 		}
+		newParentID = &pid
+	} else {
+		pid := PRODUCT_NODE_ROOT_ID
 		newParentID = &pid
 	}
 	req := models.SetParentRequest{

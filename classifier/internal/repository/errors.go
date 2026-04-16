@@ -12,4 +12,6 @@ var (
 	ErrCycleDetected     = errors.New("Cycle detected")
 	ErrEnum              = errors.New("enums can only be created under the Enumerations root (ID=3)")
 	ErrCantDeleteEnum    = errors.New("use DeleteEnum to delete enumeration nodes")
+	ErrCustomerNotFound  = errors.New("customer not found")
+	ErrInvoiceNotDraft   = errors.New("only draft invoices can be modified")
 )

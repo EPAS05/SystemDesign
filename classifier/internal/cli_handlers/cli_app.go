@@ -14,7 +14,8 @@ func StartCLI(repo repository.Repository, reader *bufio.Reader) {
 		fmt.Println("3. Операции с ЕИ")
 		fmt.Println("4. Операции с перечислениями")
 		fmt.Println("5. Параметры")
-		fmt.Println("6. Выход")
+		fmt.Println("6. Работа с документами")
+		fmt.Println("7. Выход")
 		fmt.Print("Выбор: ")
 
 		choice := readLine(reader)
@@ -30,6 +31,8 @@ func StartCLI(repo repository.Repository, reader *bufio.Reader) {
 		case "5":
 			paramMenu(repo, reader)
 		case "6":
+			documentMenu(repo, reader)
+		case "7":
 			fmt.Println("Завершение работы!")
 			return
 		default:

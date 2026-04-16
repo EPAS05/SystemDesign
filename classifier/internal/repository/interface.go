@@ -65,10 +65,33 @@ type ParameterRepository interface {
 	FindProductsByParameters(ctx context.Context, classNodeID int, filters []models.ParameterFilter) ([]*models.Product, error)
 }
 
+type CustomerRepository interface {
+	CreateCustomer(ctx context.Context, req models.CreateCustomerRequest) (*models.Customer, error)
+	GetCustomer(ctx context.Context, id int) (*models.Customer, error)
+	GetAllCustomers(ctx context.Context) ([]*models.Customer, error)
+	UpdateCustomer(ctx context.Context, req models.UpdateCustomerRequest) error
+	DeleteCustomer(ctx context.Context, id int) error
+}
+
+type InvoiceRepository interface {
+	CreateInvoice(ctx context.Context, req models.CreateInvoiceRequest) (*models.Invoice, error)
+	GetInvoice(ctx context.Context, id int) (*models.Invoice, error)
+	GetAllInvoices(ctx context.Context) ([]*models.Invoice, error)
+	UpdateInvoice(ctx context.Context, req models.UpdateInvoiceRequest) error
+	DeleteInvoice(ctx context.Context, id int) error
+	AddInvoiceItem(ctx context.Context, req models.CreateInvoiceItemRequest) (*models.InvoiceItem, error)
+	GetInvoiceItems(ctx context.Context, invoiceID int) ([]*models.InvoiceItem, error)
+	UpdateInvoiceItem(ctx context.Context, req models.UpdateInvoiceItemRequest) error
+	DeleteInvoiceItem(ctx context.Context, id int) error
+	RecalculateInvoiceTotal(ctx context.Context, invoiceID int) error
+}
+
 type Repository interface {
 	NodeRepository
 	UnitRepository
 	EnumRepository
 	ProductRepository
 	ParameterRepository
+	CustomerRepository
+	InvoiceRepository
 }

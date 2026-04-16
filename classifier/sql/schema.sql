@@ -83,6 +83,44 @@ CREATE TABLE IF NOT EXISTS parameter_values (
     UNIQUE(product_id, param_def_id)
 );
 
+CREATE TABLE IF NOT EXISTS customers (
+    id          SERIAL PRIMARY KEY,
+    name        TEXT NOT NULL,
+    tax_id      TEXT UNIQUE,      -- ИНН (уникальный, если заполнен)
+    address     TEXT,
+    created_at  TIMESTAMPTZ DEFAULT now(),
+    updated_at  TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS invoices (
+    id              SERIAL PRIMARY KEY,
+    invoice_number  TEXT NOT NULL UNIQUE,
+    invoice_date    DATE NOT NULL DEFAULT CURRENT_DATE,
+    invoice_type    TEXT NOT NULL CHECK (invoice_type IN ('incoming', 'outgoing', 'return')),
+    status          TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'confirmed', 'paid', 'shipped', 'cancelled')),
+    customer_id     INTEGER NOT NULL REFERENCES customers(id) ON DELETE RESTRICT,
+    currency        TEXT NOT NULL DEFAULT 'RUB' CHECK (currency IN ('RUB', 'USD', 'EUR')),
+    total_amount    NUMERIC(15,2) NOT NULL DEFAULT 0,
+    discount_total  NUMERIC(15,2) DEFAULT 0,
+    tax_rate        NUMERIC(5,2) DEFAULT 0,
+    tax_amount      NUMERIC(15,2) DEFAULT 0,
+    comment         TEXT,
+    created_at      TIMESTAMPTZ DEFAULT now(),
+    updated_at      TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS invoice_items (
+    id               SERIAL PRIMARY KEY,
+    invoice_id       INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+    product_id       INTEGER NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+    quantity         NUMERIC(15,3) NOT NULL CHECK (quantity > 0),
+    unit_price       NUMERIC(15,2) NOT NULL,
+    discount_percent NUMERIC(5,2) DEFAULT 0,
+    total_line       NUMERIC(15,2) NOT NULL,
+    created_at       TIMESTAMPTZ DEFAULT now(),
+    updated_at       TIMESTAMPTZ DEFAULT now()
+);
+
 INSERT INTO classifier_nodes (id, name, parent_id, is_terminal, unit_id, sort_order)
 VALUES (1, 'Trash', NULL, false, NULL, 0),
        (2, 'Изделия', NULL, false, NULL, 0),
