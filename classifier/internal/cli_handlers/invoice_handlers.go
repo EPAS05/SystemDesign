@@ -55,7 +55,6 @@ func invoiceMenu(repo repository.Repository, reader *bufio.Reader) {
 	}
 }
 
-// selectInvoice выбирает накладную по ID и переходит в подменю работы с ней
 func selectInvoice(repo repository.Repository, reader *bufio.Reader) {
 	fmt.Print("Введите ID накладной: ")
 	id, ok := readPositiveInt(reader)
@@ -79,14 +78,11 @@ func selectInvoice(repo repository.Repository, reader *bufio.Reader) {
 		}
 	}
 
-	// Переходим в подменю работы с этой накладной
 	invoiceWorkingMenu(repo, reader, invoice.ID)
 }
 
-// invoiceWorkingMenu – подменю для работы с выбранной накладной
 func invoiceWorkingMenu(repo repository.Repository, reader *bufio.Reader, invoiceID int) {
 	for {
-		// Показываем краткую информацию о накладной
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		invoice, err := repo.GetInvoice(ctx, invoiceID)
 		cancel()
@@ -128,7 +124,6 @@ func invoiceWorkingMenu(repo repository.Repository, reader *bufio.Reader, invoic
 	}
 }
 
-// showInvoiceDetails выводит полную информацию о накладной, включая позиции
 func showInvoiceDetails(repo repository.Repository, invoiceID int) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -140,7 +135,6 @@ func showInvoiceDetails(repo repository.Repository, invoiceID int) {
 	}
 	printInvoice(invoice)
 
-	// Выводим позиции
 	items, err := repo.GetInvoiceItems(ctx, invoiceID)
 	if err != nil {
 		fmt.Printf("Ошибка получения позиций: %v\n", err)
@@ -158,7 +152,6 @@ func showInvoiceDetails(repo repository.Repository, invoiceID int) {
 	}
 }
 
-// addInvoiceItemTo добавляет позицию к конкретной накладной (без запроса ID)
 func addInvoiceItemTo(repo repository.Repository, reader *bufio.Reader, invoiceID int) {
 	fmt.Print("ID продукта: ")
 	productID, ok := readPositiveInt(reader)
@@ -211,7 +204,6 @@ func addInvoiceItemTo(repo repository.Repository, reader *bufio.Reader, invoiceI
 	fmt.Printf("Позиция добавлена. ID=%d, итого=%.2f\n", item.ID, item.TotalLine)
 }
 
-// updateInvoiceItemFor обновляет позицию, предварительно проверяя принадлежность к накладной
 func updateInvoiceItemFor(repo repository.Repository, reader *bufio.Reader, invoiceID int) {
 	fmt.Print("ID позиции для обновления: ")
 	itemID, ok := readPositiveInt(reader)
@@ -220,7 +212,6 @@ func updateInvoiceItemFor(repo repository.Repository, reader *bufio.Reader, invo
 		return
 	}
 
-	// Проверим, что позиция принадлежит текущей накладной
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	items, err := repo.GetInvoiceItems(ctx, invoiceID)
@@ -280,7 +271,6 @@ func updateInvoiceItemFor(repo repository.Repository, reader *bufio.Reader, invo
 	fmt.Println("Позиция обновлена.")
 }
 
-// deleteInvoiceItemFor удаляет позицию, проверяя принадлежность к накладной
 func deleteInvoiceItemFor(repo repository.Repository, reader *bufio.Reader, invoiceID int) {
 	fmt.Print("ID позиции для удаления: ")
 	itemID, ok := readPositiveInt(reader)
@@ -289,7 +279,6 @@ func deleteInvoiceItemFor(repo repository.Repository, reader *bufio.Reader, invo
 		return
 	}
 
-	// Проверяем принадлежность
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	items, err := repo.GetInvoiceItems(ctx, invoiceID)
@@ -330,7 +319,6 @@ func deleteInvoiceItemFor(repo repository.Repository, reader *bufio.Reader, invo
 	fmt.Println("Позиция удалена.")
 }
 
-// updateInvoiceDetails обновляет реквизиты накладной
 func updateInvoiceDetails(repo repository.Repository, reader *bufio.Reader, invoiceID int) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -447,7 +435,6 @@ func updateInvoiceDetails(repo repository.Repository, reader *bufio.Reader, invo
 	fmt.Println("Накладная обновлена.")
 }
 
-// confirmDeleteInvoice удаляет накладную после подтверждения
 func confirmDeleteInvoice(repo repository.Repository, reader *bufio.Reader, invoiceID int) bool {
 	fmt.Print("Удалить накладную? (yes/no): ")
 	if readLine(reader) != "yes" {
@@ -469,8 +456,6 @@ func confirmDeleteInvoice(repo repository.Repository, reader *bufio.Reader, invo
 	fmt.Println("Накладная удалена.")
 	return true
 }
-
-// ---------- Ниже идут вспомогательные функции, оставшиеся без изменений ----------
 
 func createInvoice(repo repository.Repository, reader *bufio.Reader) {
 	fmt.Println("Доступные заказчики:")
