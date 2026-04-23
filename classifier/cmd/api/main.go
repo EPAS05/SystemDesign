@@ -28,6 +28,7 @@ func main() {
 	unitHandler := &api_handlers.UnitHandler{Repo: repo}
 	enumHandler := &api_handlers.EnumHandler{Repo: repo}
 	productHandler := &api_handlers.ProductHandler{Repo: repo, NodeRepo: repo}
+	customerHandler := &api_handlers.CustomerHandler{Repo: repo}
 	parameterHandler := &api_handlers.ParameterHandler{
 		ParamRepo:   repo,
 		NodeRepo:    repo,
@@ -89,6 +90,12 @@ func main() {
 	api.HandleFunc("/parameter-values/{id:[0-9]+}", parameterHandler.UpdateParameterValue).Methods("PUT")
 	api.HandleFunc("/parameter-values/{id:[0-9]+}", parameterHandler.DeleteParameterValue).Methods("DELETE")
 	api.HandleFunc("/nodes/{node_id:[0-9]+}/products/search", parameterHandler.FindProductsByParameters).Methods("POST")
+
+	api.HandleFunc("/documents/customers", customerHandler.CreateCustomer).Methods("POST")
+	api.HandleFunc("/documents/customers", customerHandler.GetAllCustomers).Methods("GET")
+	api.HandleFunc("/documents/customers/{id:[0-9]+}", customerHandler.GetCustomer).Methods("GET")
+	api.HandleFunc("/documents/customers/{id:[0-9]+}", customerHandler.UpdateCustomer).Methods("PUT")
+	api.HandleFunc("/documents/customers/{id:[0-9]+}", customerHandler.DeleteCustomer).Methods("DELETE")
 
 	log.Println("Server starting on :8080")
 	log.Fatal(http.ListenAndServe(":8080", r))
