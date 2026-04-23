@@ -20,4 +20,4 @@ COPY --from=builder /app/cmd/cli/classifier .
 
 COPY --from=builder /app/sql ./sql
 
-CMD [ "./classifier" ]
+CMD ["./classifier"]

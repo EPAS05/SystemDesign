@@ -1,0 +1,82 @@
+name: systemdesign
+
+services:
+  db:
+    image: postgres:18-alpine
+    container_name: systemdesign_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-classifier}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-secret}
+      POSTGRES_DB: ${DB_NAME:-classifier}
+    volumes:
+      - pg_data:/var/lib/postgresql
+      - ./classifier/sql/schema.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-classifier} -d ${DB_NAME:-classifier}"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+    networks:
+      - systemdesign_net
+
+  api:
+    build:
+      context: ./classifier
+      dockerfile: Dockerfile.api
+    container_name: systemdesign_api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-classifier}
+      DB_PASSWORD: ${DB_PASSWORD:-secret}
+      DB_NAME: ${DB_NAME:-classifier}
+    ports:
+      - "8080:8080"
+    networks:
+      - systemdesign_net
+
+  cli:
+    build:
+      context: ./classifier
+      dockerfile: Dockerfile
+    container_name: systemdesign_cli
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-classifier}
+      DB_PASSWORD: ${DB_PASSWORD:-secret}
+      DB_NAME: ${DB_NAME:-classifier}
+    stdin_open: true
+    tty: true
+    networks:
+      - systemdesign_net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: systemdesign_frontend
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_started
+    ports:
+      - "3000:80"
+    networks:
+      - systemdesign_net
+
+volumes:
+  pg_data:
+    name: classifier_pg_data
+
+networks:
+  systemdesign_net:
+    driver: bridge
