@@ -12,6 +12,7 @@ services:
     volumes:
       - pg_data:/var/lib/postgresql
       - ./classifier/sql/schema.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./classifier/sql/seed.sql:/seed.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-classifier} -d ${DB_NAME:-classifier}"]
       interval: 10s
