@@ -374,6 +374,11 @@ func (r *PostgresRepository) FindProductsByParameters(ctx context.Context, class
 			return nil, fmt.Errorf("invalid param_def_id in filter %d", i)
 		}
 
+		paramDef, err := r.GetParameterDefinition(ctx, filter.ParamDefID)
+		if err != nil {
+			return nil, err
+		}
+
 		operator := strings.TrimSpace(filter.Operator)
 		if operator == "" {
 			return nil, fmt.Errorf("operator is required in filter %d", i)
@@ -394,7 +399,11 @@ func (r *PostgresRepository) FindProductsByParameters(ctx context.Context, class
 
 		switch operator {
 		case "=":
-			if enumValueID, ok := parseIntFilterValue(filter.Value); ok {
+			if paramDef.ParameterType == "enum" {
+				enumValueID, ok := parseIntFilterValue(filter.Value)
+				if !ok {
+					return nil, fmt.Errorf("enum filter %d requires enum value id", i)
+				}
 				queryBuilder.WriteString("AND ")
 				queryBuilder.WriteString(alias)
 				queryBuilder.WriteString(".value_enum_id = $")
@@ -407,7 +416,7 @@ func (r *PostgresRepository) FindProductsByParameters(ctx context.Context, class
 
 			numericValue, ok := parseFloatFilterValue(filter.Value)
 			if !ok {
-				return nil, fmt.Errorf("unsupported '=' value for filter %d", i)
+				return nil, fmt.Errorf("numeric filter %d requires numeric value", i)
 			}
 			queryBuilder.WriteString("AND ")
 			queryBuilder.WriteString(alias)

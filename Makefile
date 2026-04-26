@@ -9,7 +9,7 @@ api:
 	$(COMPOSE) up -d --build db api
 
 cli:
-	$(COMPOSE) up -d --build db
+	$(COMPOSE) up -d --build db cli
 	$(COMPOSE) run --rm cli
 
 seed:
