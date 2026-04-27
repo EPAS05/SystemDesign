@@ -608,7 +608,7 @@ func searchProductsByParams(repo repository.Repository, reader *bufio.Reader) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
 
 	paramDefs, err := repo.GetParameterDefinitionsForClass(ctx, classID)
