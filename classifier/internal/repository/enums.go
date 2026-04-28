@@ -97,15 +97,15 @@ func (r *PostgresRepository) GetEnumsByTypeNode(ctx context.Context, typeNodeID 
 	return enums, rows.Err()
 }
 
-func (r *PostgresRepository) UpdateEnum(ctx context.Context, req models.UpdateEnumRequest) error {
+func (r *PostgresRepository) UpdateEnum(ctx context.Context, req models.UpdateEnumRequest) (*models.Enum, error) {
 	if req.TypeNodeID != 0 {
 		var exists bool
 		err := r.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM classifier_nodes WHERE id = $1)`, req.TypeNodeID).Scan(&exists)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if !exists {
-			return fmt.Errorf("type node with id %d does not exist", req.TypeNodeID)
+			return nil, fmt.Errorf("type node with id %d does not exist", req.TypeNodeID)
 		}
 	}
 
@@ -113,16 +113,20 @@ func (r *PostgresRepository) UpdateEnum(ctx context.Context, req models.UpdateEn
 		UPDATE enums
 		SET name = $1, description = $2, type_node_id = $3, updated_at = now()
 		WHERE id = $4
+		RETURNING id, name, description, type_node_id, created_at, updated_at
 	`
-	result, err := r.db.ExecContext(ctx, query, req.Name, req.Description, req.TypeNodeID, req.ID)
+
+	var enum models.Enum
+	err := r.db.QueryRowContext(ctx, query, req.Name, req.Description, req.TypeNodeID, req.ID).Scan(
+		&enum.ID, &enum.Name, &enum.Description, &enum.TypeNodeID, &enum.CreatedAt, &enum.UpdatedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
 	if err != nil {
-		return err
+		return nil, err
 	}
-	rows, _ := result.RowsAffected()
-	if rows == 0 {
-		return ErrNotFound
-	}
-	return nil
+	return &enum, nil
 }
 
 func (r *PostgresRepository) DeleteEnum(ctx context.Context, id int) error {
@@ -192,21 +196,24 @@ func (r *PostgresRepository) GetEnumValues(ctx context.Context, enumID int) ([]*
 	return values, rows.Err()
 }
 
-func (r *PostgresRepository) UpdateEnumValue(ctx context.Context, req models.UpdateEnumValueRequest) error {
+func (r *PostgresRepository) UpdateEnumValue(ctx context.Context, req models.UpdateEnumValueRequest) (*models.EnumValue, error) {
+	var enumValue models.EnumValue
 	query := `
 		UPDATE enum_values 
 		SET value = $1, updated_at = now() 
 		WHERE id = $2
+		RETURNING id, enum_id, value, sort_order, created_at, updated_at
 	`
-	result, err := r.db.ExecContext(ctx, query, req.Value, req.ID)
+	err := r.db.QueryRowContext(ctx, query, req.Value, req.ID).Scan(
+		&enumValue.ID, &enumValue.EnumID, &enumValue.Value, &enumValue.SortOrder, &enumValue.CreatedAt, &enumValue.UpdatedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
 	if err != nil {
-		return err
+		return nil, err
 	}
-	rows, _ := result.RowsAffected()
-	if rows == 0 {
-		return ErrNotFound
-	}
-	return nil
+	return &enumValue, nil
 }
 
 func (r *PostgresRepository) DeleteEnumValue(ctx context.Context, id int) error {

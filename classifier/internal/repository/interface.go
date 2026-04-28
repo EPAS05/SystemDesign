@@ -33,12 +33,12 @@ type EnumRepository interface {
 	GetEnum(ctx context.Context, id int) (*models.Enum, error)
 	GetAllEnums(ctx context.Context) ([]*models.Enum, error)
 	GetEnumsByTypeNode(ctx context.Context, typeNodeID int) ([]*models.Enum, error)
-	UpdateEnum(ctx context.Context, req models.UpdateEnumRequest) error
+	UpdateEnum(ctx context.Context, req models.UpdateEnumRequest) (*models.Enum, error)
 	DeleteEnum(ctx context.Context, id int) error
 	CreateEnumValue(ctx context.Context, req models.CreateEnumValueRequest) (*models.EnumValue, error)
 	GetEnumValues(ctx context.Context, enumID int) ([]*models.EnumValue, error)
 	GetEnumValue(ctx context.Context, enumValueID int) (*models.EnumValue, error)
-	UpdateEnumValue(ctx context.Context, req models.UpdateEnumValueRequest) error
+	UpdateEnumValue(ctx context.Context, req models.UpdateEnumValueRequest) (*models.EnumValue, error)
 	DeleteEnumValue(ctx context.Context, id int) error
 	ReorderEnumValues(ctx context.Context, req models.ReorderEnumValuesRequest) error
 }

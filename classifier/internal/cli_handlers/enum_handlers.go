@@ -236,12 +236,12 @@ func updateEnum(repo repository.Repository, reader *bufio.Reader, enum *models.E
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	err := repo.UpdateEnum(ctx, req)
+	updatedEnum, err := repo.UpdateEnum(ctx, req)
 	if err != nil {
 		fmt.Printf("Ошибка: %v\n", err)
 		return
 	}
-	fmt.Println("Перечисление обновлено")
+	fmt.Printf("Перечисление обновлено: %d - %s\n", updatedEnum.ID, updatedEnum.Name)
 }
 
 func updateEnumValue(repo repository.Repository, reader *bufio.Reader, enumID int) {
@@ -265,13 +265,12 @@ func updateEnumValue(repo repository.Repository, reader *bufio.Reader, enumID in
 		ID:    *valueID,
 		Value: newVal,
 	}
-	err = repo.UpdateEnumValue(ctx, req)
+	updatedValue, err := repo.UpdateEnumValue(ctx, req)
 	if err != nil {
 		fmt.Printf("Ошибка обновления значения: %v\n", err)
 		return
 	}
-
-	fmt.Println("Значение обновлено.")
+	fmt.Printf("Значение обновлено: ID %d - %s\n", updatedValue.ID, updatedValue.Value)
 }
 
 func deleteEnumValue(repo repository.Repository, reader *bufio.Reader, enumID int) {

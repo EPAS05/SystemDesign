@@ -1,13 +1,11 @@
 package api_handlers
 
 import (
+	"classifier/internal/http/response"
 	"classifier/internal/models"
 	"classifier/internal/repository"
-	"context"
-	"encoding/json"
 	"net/http"
 	"strconv"
-	"time"
 
 	"github.com/gorilla/mux"
 )
@@ -30,16 +28,16 @@ type UpdateCustomerRequest struct {
 
 func (h *CustomerHandler) CreateCustomer(w http.ResponseWriter, r *http.Request) {
 	var req CreateCustomerRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+	if err := response.ReadJSON(r, &req); err != nil {
+		response.WriteError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 	if req.Name == "" {
-		http.Error(w, "name is required", http.StatusBadRequest)
+		response.WriteError(w, http.StatusBadRequest, "name is required")
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := response.RequestContext(r)
 	defer cancel()
 
 	customer, err := h.Repo.CreateCustomer(ctx, models.CreateCustomerRequest{
@@ -48,77 +46,73 @@ func (h *CustomerHandler) CreateCustomer(w http.ResponseWriter, r *http.Request)
 		Address: req.Address,
 	})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(customer)
+	response.WriteJSON(w, http.StatusCreated, customer)
 }
 
 func (h *CustomerHandler) GetCustomer(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, err := strconv.Atoi(vars["id"])
 	if err != nil || id <= 0 {
-		http.Error(w, "Invalid id", http.StatusBadRequest)
+		response.WriteError(w, http.StatusBadRequest, "Invalid id")
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := response.RequestContext(r)
 	defer cancel()
 
 	customer, err := h.Repo.GetCustomer(ctx, id)
 	if err != nil {
 		if err == repository.ErrNotFound || err == repository.ErrCustomerNotFound {
-			http.Error(w, "Customer not found", http.StatusNotFound)
+			response.WriteError(w, http.StatusNotFound, "Customer not found")
 		} else {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			response.WriteError(w, http.StatusInternalServerError, err.Error())
 		}
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(customer)
+	response.WriteJSON(w, http.StatusOK, customer)
 }
 
 func (h *CustomerHandler) GetAllCustomers(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := response.RequestContext(r)
 	defer cancel()
 
 	customers, err := h.Repo.GetAllCustomers(ctx)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(customers)
+	response.WriteJSON(w, http.StatusOK, customers)
 }
 
 func (h *CustomerHandler) UpdateCustomer(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, err := strconv.Atoi(vars["id"])
 	if err != nil || id <= 0 {
-		http.Error(w, "Invalid id", http.StatusBadRequest)
+		response.WriteError(w, http.StatusBadRequest, "Invalid id")
 		return
 	}
 
 	var req UpdateCustomerRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+	if err := response.ReadJSON(r, &req); err != nil {
+		response.WriteError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := response.RequestContext(r)
 	defer cancel()
 
 	current, err := h.Repo.GetCustomer(ctx, id)
 	if err != nil {
 		if err == repository.ErrNotFound || err == repository.ErrCustomerNotFound {
-			http.Error(w, "Customer not found", http.StatusNotFound)
+			response.WriteError(w, http.StatusNotFound, "Customer not found")
 		} else {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			response.WriteError(w, http.StatusInternalServerError, err.Error())
 		}
 		return
 	}
@@ -128,7 +122,7 @@ func (h *CustomerHandler) UpdateCustomer(w http.ResponseWriter, r *http.Request)
 		name = *req.Name
 	}
 	if name == "" {
-		http.Error(w, "name cannot be empty", http.StatusBadRequest)
+		response.WriteError(w, http.StatusBadRequest, "name cannot be empty")
 		return
 	}
 
@@ -150,38 +144,36 @@ func (h *CustomerHandler) UpdateCustomer(w http.ResponseWriter, r *http.Request)
 	})
 	if err != nil {
 		if err == repository.ErrNotFound || err == repository.ErrCustomerNotFound {
-			http.Error(w, "Customer not found", http.StatusNotFound)
+			response.WriteError(w, http.StatusNotFound, "Customer not found")
 		} else {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			response.WriteError(w, http.StatusInternalServerError, err.Error())
 		}
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	response.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 func (h *CustomerHandler) DeleteCustomer(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, err := strconv.Atoi(vars["id"])
 	if err != nil || id <= 0 {
-		http.Error(w, "Invalid id", http.StatusBadRequest)
+		response.WriteError(w, http.StatusBadRequest, "Invalid id")
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := response.RequestContext(r)
 	defer cancel()
 
 	err = h.Repo.DeleteCustomer(ctx, id)
 	if err != nil {
 		if err == repository.ErrNotFound || err == repository.ErrCustomerNotFound {
-			http.Error(w, "Customer not found", http.StatusNotFound)
+			response.WriteError(w, http.StatusNotFound, "Customer not found")
 		} else {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			response.WriteError(w, http.StatusInternalServerError, err.Error())
 		}
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	response.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
