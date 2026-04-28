@@ -4,7 +4,6 @@ import (
 	"classifier/internal/http/response"
 	"classifier/internal/models"
 	"classifier/internal/repository"
-	"encoding/json"
 	"net/http"
 	"strconv"
 
@@ -193,7 +192,7 @@ func (h *EnumHandler) CreateEnumValue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req CreateEnumValueRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := response.ReadJSON(r, &req); err != nil {
 		response.WriteError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
@@ -265,7 +264,7 @@ func (h *EnumHandler) UpdateEnumValue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req UpdateEnumValueRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := response.ReadJSON(r, &req); err != nil {
 		response.WriteError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
@@ -323,7 +322,7 @@ func (h *EnumHandler) ReorderEnumValues(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	var req ReorderEnumValuesRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := response.ReadJSON(r, &req); err != nil {
 		response.WriteError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
