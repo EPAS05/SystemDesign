@@ -1,13 +1,11 @@
 package api_handlers
 
 import (
+	"classifier/internal/http/response"
 	"classifier/internal/models"
 	"classifier/internal/repository"
-	"context"
-	"encoding/json"
 	"net/http"
 	"strconv"
-	"time"
 
 	"github.com/gorilla/mux"
 )
@@ -28,32 +26,30 @@ type UpdateUnitRequest struct {
 
 func (h *UnitHandler) CreateUnit(w http.ResponseWriter, r *http.Request) {
 	var req CreateUnitRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+	if err := response.ReadJSON(r, &req); err != nil {
+		response.WriteError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 	if req.Name == "" {
-		http.Error(w, "name is required", http.StatusBadRequest)
+		response.WriteError(w, http.StatusBadRequest, "name is required")
 		return
 	}
 	if req.Multiplier <= 0 {
-		http.Error(w, "multiplier must be positive", http.StatusBadRequest)
+		response.WriteError(w, http.StatusBadRequest, "multiplier must be positive")
 		return
 	}
 	createReq := models.CreateUnitRequest{
 		Name:       req.Name,
 		Multiplier: req.Multiplier,
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := response.RequestContext(r)
 	defer cancel()
 	unit, err := h.Repo.CreateUnit(ctx, createReq)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(unit)
+	response.WriteJSON(w, http.StatusCreated, unit)
 }
 
 func (h *UnitHandler) GetUnit(w http.ResponseWriter, r *http.Request) {
@@ -61,34 +57,32 @@ func (h *UnitHandler) GetUnit(w http.ResponseWriter, r *http.Request) {
 	idStr := vars["id"]
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, "Invalid id", http.StatusBadRequest)
+		response.WriteError(w, http.StatusBadRequest, "Invalid id")
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := response.RequestContext(r)
 	defer cancel()
 	unit, err := h.Repo.GetUnit(ctx, id)
 	if err != nil {
 		if err == repository.ErrNotFound {
-			http.Error(w, "Unit not found", http.StatusNotFound)
+			response.WriteError(w, http.StatusNotFound, "Unit not found")
 		} else {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			response.WriteError(w, http.StatusInternalServerError, err.Error())
 		}
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(unit)
+	response.WriteJSON(w, http.StatusOK, unit)
 }
 
 func (h *UnitHandler) GetAllUnits(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := response.RequestContext(r)
 	defer cancel()
 	units, err := h.Repo.GetAllUnits(ctx)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(units)
+	response.WriteJSON(w, http.StatusOK, units)
 }
 
 func (h *UnitHandler) UpdateUnit(w http.ResponseWriter, r *http.Request) {
@@ -96,20 +90,20 @@ func (h *UnitHandler) UpdateUnit(w http.ResponseWriter, r *http.Request) {
 	idStr := vars["id"]
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, "Invalid id", http.StatusBadRequest)
+		response.WriteError(w, http.StatusBadRequest, "Invalid id")
 		return
 	}
 	var req UpdateUnitRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+	if err := response.ReadJSON(r, &req); err != nil {
+		response.WriteError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 	if req.Name == "" {
-		http.Error(w, "name is required", http.StatusBadRequest)
+		response.WriteError(w, http.StatusBadRequest, "name is required")
 		return
 	}
 	if req.Multiplier <= 0 {
-		http.Error(w, "multiplier must be positive", http.StatusBadRequest)
+		response.WriteError(w, http.StatusBadRequest, "multiplier must be positive")
 		return
 	}
 	updateReq := models.UpdateUnitRequest{
@@ -117,19 +111,18 @@ func (h *UnitHandler) UpdateUnit(w http.ResponseWriter, r *http.Request) {
 		Name:       req.Name,
 		Multiplier: req.Multiplier,
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := response.RequestContext(r)
 	defer cancel()
-	err = h.Repo.UpdateUnit(ctx, updateReq)
+	unit, err := h.Repo.UpdateUnit(ctx, updateReq)
 	if err != nil {
 		if err == repository.ErrNotFound {
-			http.Error(w, "Unit not found", http.StatusNotFound)
+			response.WriteError(w, http.StatusNotFound, "Unit not found")
 		} else {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			response.WriteError(w, http.StatusInternalServerError, err.Error())
 		}
 		return
 	}
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	response.WriteJSON(w, http.StatusOK, unit)
 }
 
 func (h *UnitHandler) DeleteUnit(w http.ResponseWriter, r *http.Request) {
@@ -137,20 +130,19 @@ func (h *UnitHandler) DeleteUnit(w http.ResponseWriter, r *http.Request) {
 	idStr := vars["id"]
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, "Invalid id", http.StatusBadRequest)
+		response.WriteError(w, http.StatusBadRequest, "Invalid id")
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := response.RequestContext(r)
 	defer cancel()
 	err = h.Repo.DeleteUnit(ctx, id)
 	if err != nil {
 		if err == repository.ErrNotFound {
-			http.Error(w, "Unit not found", http.StatusNotFound)
+			response.WriteError(w, http.StatusNotFound, "Unit not found")
 		} else {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			response.WriteError(w, http.StatusInternalServerError, err.Error())
 		}
 		return
 	}
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	response.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }

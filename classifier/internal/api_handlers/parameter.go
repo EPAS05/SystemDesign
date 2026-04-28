@@ -1,14 +1,12 @@
 package api_handlers
 
 import (
+	"classifier/internal/http/response"
 	"classifier/internal/models"
 	"classifier/internal/repository"
-	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
-	"time"
 
 	"github.com/gorilla/mux"
 )
@@ -63,51 +61,51 @@ func (h *ParameterHandler) CreateParameterDefinition(w http.ResponseWriter, r *h
 	nodeIDStr := vars["node_id"]
 	nodeID, err := strconv.Atoi(nodeIDStr)
 	if err != nil {
-		http.Error(w, "Invalid node_id", http.StatusBadRequest)
+		response.WriteError(w, http.StatusBadRequest, "Invalid node_id")
 		return
 	}
 
 	var req CreateParamDefRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+	if err := response.ReadJSON(r, &req); err != nil {
+		response.WriteError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 	if req.Name == "" {
-		http.Error(w, "name is required", http.StatusBadRequest)
+		response.WriteError(w, http.StatusBadRequest, "name is required")
 		return
 	}
 	if req.ParameterType != "number" && req.ParameterType != "enum" {
-		http.Error(w, "parameter_type must be 'number' or 'enum'", http.StatusBadRequest)
+		response.WriteError(w, http.StatusBadRequest, "parameter_type must be 'number' or 'enum'")
 		return
 	}
 	if req.ParameterType == "enum" && req.EnumID == nil {
-		http.Error(w, "enum_id is required for enum parameter", http.StatusBadRequest)
+		response.WriteError(w, http.StatusBadRequest, "enum_id is required for enum parameter")
 		return
 	}
 	if req.ParameterType == "enum" && req.UnitID != nil {
-		http.Error(w, "unit_id is not allowed for enum parameter", http.StatusBadRequest)
+		response.WriteError(w, http.StatusBadRequest, "unit_id is not allowed for enum parameter")
 		return
 	}
 	if req.ParameterType == "number" && req.EnumID != nil {
-		http.Error(w, "enum_id is not allowed for number parameter", http.StatusBadRequest)
+		response.WriteError(w, http.StatusBadRequest, "enum_id is not allowed for number parameter")
 		return
 	}
 	if req.Constraints != nil && req.Constraints.MinValue != nil && req.Constraints.MaxValue != nil {
 		if *req.Constraints.MinValue > *req.Constraints.MaxValue {
-			http.Error(w, "min_value cannot be greater than max_value", http.StatusBadRequest)
+			response.WriteError(w, http.StatusBadRequest, "min_value cannot be greater than max_value")
 			return
 		}
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := response.RequestContext(r)
 	defer cancel()
 
 	_, err = h.NodeRepo.GetNode(ctx, nodeID)
 	if err != nil {
 		if err == repository.ErrNotFound {
-			http.Error(w, "Node not found", http.StatusNotFound)
+			response.WriteError(w, http.StatusNotFound, "Node not found")
 		} else {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			response.WriteError(w, http.StatusInternalServerError, err.Error())
 		}
 		return
 	}
@@ -116,9 +114,9 @@ func (h *ParameterHandler) CreateParameterDefinition(w http.ResponseWriter, r *h
 		_, err = h.UnitRepo.GetUnit(ctx, *req.UnitID)
 		if err != nil {
 			if err == repository.ErrNotFound {
-				http.Error(w, "Unit not found", http.StatusNotFound)
+				response.WriteError(w, http.StatusNotFound, "Unit not found")
 			} else {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				response.WriteError(w, http.StatusInternalServerError, err.Error())
 			}
 			return
 		}
@@ -128,9 +126,9 @@ func (h *ParameterHandler) CreateParameterDefinition(w http.ResponseWriter, r *h
 		_, err = h.EnumRepo.GetEnum(ctx, *req.EnumID)
 		if err != nil {
 			if err == repository.ErrNotFound {
-				http.Error(w, "Enum not found", http.StatusNotFound)
+				response.WriteError(w, http.StatusNotFound, "Enum not found")
 			} else {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				response.WriteError(w, http.StatusInternalServerError, err.Error())
 			}
 			return
 		}
@@ -149,12 +147,10 @@ func (h *ParameterHandler) CreateParameterDefinition(w http.ResponseWriter, r *h
 	}
 	param, err := h.ParamRepo.CreateParameterDefinition(ctx, createReq)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(param)
+	response.WriteJSON(w, http.StatusCreated, param)
 }
 
 func (h *ParameterHandler) GetParameterDefinition(w http.ResponseWriter, r *http.Request) {
@@ -162,22 +158,21 @@ func (h *ParameterHandler) GetParameterDefinition(w http.ResponseWriter, r *http
 	idStr := vars["id"]
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, "Invalid id", http.StatusBadRequest)
+		response.WriteError(w, http.StatusBadRequest, "Invalid id")
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := response.RequestContext(r)
 	defer cancel()
 	param, err := h.ParamRepo.GetParameterDefinition(ctx, id)
 	if err != nil {
 		if err == repository.ErrNotFound {
-			http.Error(w, "Parameter definition not found", http.StatusNotFound)
+			response.WriteError(w, http.StatusNotFound, "Parameter definition not found")
 		} else {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			response.WriteError(w, http.StatusInternalServerError, err.Error())
 		}
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(param)
+	response.WriteJSON(w, http.StatusOK, param)
 }
 
 func (h *ParameterHandler) GetParameterDefinitionsForClass(w http.ResponseWriter, r *http.Request) {
@@ -185,18 +180,17 @@ func (h *ParameterHandler) GetParameterDefinitionsForClass(w http.ResponseWriter
 	nodeIDStr := vars["node_id"]
 	nodeID, err := strconv.Atoi(nodeIDStr)
 	if err != nil {
-		http.Error(w, "Invalid node_id", http.StatusBadRequest)
+		response.WriteError(w, http.StatusBadRequest, "Invalid node_id")
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := response.RequestContext(r)
 	defer cancel()
 	params, err := h.ParamRepo.GetParameterDefinitionsForClass(ctx, nodeID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(params)
+	response.WriteJSON(w, http.StatusOK, params)
 }
 
 func (h *ParameterHandler) GetParameterConstraints(w http.ResponseWriter, r *http.Request) {
@@ -204,22 +198,21 @@ func (h *ParameterHandler) GetParameterConstraints(w http.ResponseWriter, r *htt
 	idStr := vars["id"]
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, "Invalid id", http.StatusBadRequest)
+		response.WriteError(w, http.StatusBadRequest, "Invalid id")
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := response.RequestContext(r)
 	defer cancel()
 	constraints, err := h.ParamRepo.GetParameterConstraints(ctx, id)
 	if err != nil {
 		if err == repository.ErrNotFound {
-			http.Error(w, "Parameter constraints not found", http.StatusNotFound)
+			response.WriteError(w, http.StatusNotFound, "Parameter constraints not found")
 		} else {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			response.WriteError(w, http.StatusInternalServerError, err.Error())
 		}
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(constraints)
+	response.WriteJSON(w, http.StatusOK, constraints)
 }
 
 func (h *ParameterHandler) UpdateParameterDefinition(w http.ResponseWriter, r *http.Request) {
@@ -227,24 +220,24 @@ func (h *ParameterHandler) UpdateParameterDefinition(w http.ResponseWriter, r *h
 	idStr := vars["id"]
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, "Invalid id", http.StatusBadRequest)
+		response.WriteError(w, http.StatusBadRequest, "Invalid id")
 		return
 	}
 	var req UpdateParamDefRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+	if err := response.ReadJSON(r, &req); err != nil {
+		response.WriteError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := response.RequestContext(r)
 	defer cancel()
 
 	param, err := h.ParamRepo.GetParameterDefinition(ctx, id)
 	if err != nil {
 		if err == repository.ErrNotFound {
-			http.Error(w, "Parameter definition not found", http.StatusNotFound)
+			response.WriteError(w, http.StatusNotFound, "Parameter definition not found")
 		} else {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			response.WriteError(w, http.StatusInternalServerError, err.Error())
 		}
 		return
 	}
@@ -299,9 +292,9 @@ func (h *ParameterHandler) UpdateParameterDefinition(w http.ResponseWriter, r *h
 			_, err = h.UnitRepo.GetUnit(ctx, *req.UnitID)
 			if err != nil {
 				if err == repository.ErrNotFound {
-					http.Error(w, "Unit not found", http.StatusNotFound)
+					response.WriteError(w, http.StatusNotFound, "Unit not found")
 				} else {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
+					response.WriteError(w, http.StatusInternalServerError, err.Error())
 				}
 				return
 			}
@@ -310,16 +303,16 @@ func (h *ParameterHandler) UpdateParameterDefinition(w http.ResponseWriter, r *h
 
 	if param.ParameterType == "enum" {
 		if req.UnitID != nil {
-			http.Error(w, "unit_id is not allowed for enum parameter", http.StatusBadRequest)
+			response.WriteError(w, http.StatusBadRequest, "unit_id is not allowed for enum parameter")
 			return
 		}
 		if req.EnumID != nil {
 			_, err = h.EnumRepo.GetEnum(ctx, *req.EnumID)
 			if err != nil {
 				if err == repository.ErrNotFound {
-					http.Error(w, "Enum not found", http.StatusNotFound)
+					response.WriteError(w, http.StatusNotFound, "Enum not found")
 				} else {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
+					response.WriteError(w, http.StatusInternalServerError, err.Error())
 				}
 				return
 			}
@@ -337,17 +330,16 @@ func (h *ParameterHandler) UpdateParameterDefinition(w http.ResponseWriter, r *h
 		Constraints: constraints,
 	}
 
-	err = h.ParamRepo.UpdateParameterDefinition(ctx, updateReq)
+	updatedParam, err := h.ParamRepo.UpdateParameterDefinition(ctx, updateReq)
 	if err != nil {
 		if err == repository.ErrNotFound {
-			http.Error(w, "Parameter definition not found", http.StatusNotFound)
+			response.WriteError(w, http.StatusNotFound, "Parameter definition not found")
 		} else {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			response.WriteError(w, http.StatusInternalServerError, err.Error())
 		}
 		return
 	}
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	response.WriteJSON(w, http.StatusOK, updatedParam)
 }
 
 func (h *ParameterHandler) DeleteParameterDefinition(w http.ResponseWriter, r *http.Request) {
@@ -355,22 +347,21 @@ func (h *ParameterHandler) DeleteParameterDefinition(w http.ResponseWriter, r *h
 	idStr := vars["id"]
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, "Invalid id", http.StatusBadRequest)
+		response.WriteError(w, http.StatusBadRequest, "Invalid id")
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := response.RequestContext(r)
 	defer cancel()
 	err = h.ParamRepo.DeleteParameterDefinition(ctx, id)
 	if err != nil {
 		if err == repository.ErrNotFound {
-			http.Error(w, "Parameter definition not found", http.StatusNotFound)
+			response.WriteError(w, http.StatusNotFound, "Parameter definition not found")
 		} else {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			response.WriteError(w, http.StatusInternalServerError, err.Error())
 		}
 		return
 	}
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	response.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 func (h *ParameterHandler) SetParameterValue(w http.ResponseWriter, r *http.Request) {
@@ -378,40 +369,40 @@ func (h *ParameterHandler) SetParameterValue(w http.ResponseWriter, r *http.Requ
 	productIDStr := vars["product_id"]
 	productID, err := strconv.Atoi(productIDStr)
 	if err != nil {
-		http.Error(w, "Invalid product_id", http.StatusBadRequest)
+		response.WriteError(w, http.StatusBadRequest, "Invalid product_id")
 		return
 	}
 
 	var req SetParameterValueRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+	if err := response.ReadJSON(r, &req); err != nil {
+		response.WriteError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 	if req.ProductID != 0 && req.ProductID != productID {
-		http.Error(w, "product_id mismatch", http.StatusBadRequest)
+		response.WriteError(w, http.StatusBadRequest, "product_id mismatch")
 		return
 	}
 	if req.ParamDefID == 0 {
-		http.Error(w, "param_def_id is required", http.StatusBadRequest)
+		response.WriteError(w, http.StatusBadRequest, "param_def_id is required")
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := response.RequestContext(r)
 	defer cancel()
 
 	product, err := h.ProductRepo.GetProduct(ctx, productID)
 	if err != nil {
 		if err == repository.ErrNotFound {
-			http.Error(w, "Product not found", http.StatusNotFound)
+			response.WriteError(w, http.StatusNotFound, "Product not found")
 		} else {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			response.WriteError(w, http.StatusInternalServerError, err.Error())
 		}
 		return
 	}
 
 	params, err := h.ParamRepo.GetParameterDefinitionsForClass(ctx, product.ClassNodeID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -423,27 +414,27 @@ func (h *ParameterHandler) SetParameterValue(w http.ResponseWriter, r *http.Requ
 		}
 	}
 	if target == nil {
-		http.Error(w, "Parameter does not belong to this product class", http.StatusBadRequest)
+		response.WriteError(w, http.StatusBadRequest, "Parameter does not belong to this product class")
 		return
 	}
 
 	if target.ParameterType == "number" {
 		if req.ValueNumeric == nil {
-			http.Error(w, "value_numeric is required for number parameter", http.StatusBadRequest)
+			response.WriteError(w, http.StatusBadRequest, "value_numeric is required for number parameter")
 			return
 		}
 		if req.ValueEnumID != nil {
-			http.Error(w, "value_enum_id is not allowed for number parameter", http.StatusBadRequest)
+			response.WriteError(w, http.StatusBadRequest, "value_enum_id is not allowed for number parameter")
 			return
 		}
 		constraints, err := h.ParamRepo.GetParameterConstraints(ctx, target.ID)
 		if err == nil && constraints != nil {
 			if constraints.MinValue != nil && *req.ValueNumeric < *constraints.MinValue {
-				http.Error(w, "value_numeric is below minimum", http.StatusBadRequest)
+				response.WriteError(w, http.StatusBadRequest, "value_numeric is below minimum")
 				return
 			}
 			if constraints.MaxValue != nil && *req.ValueNumeric > *constraints.MaxValue {
-				http.Error(w, "value_numeric is above maximum", http.StatusBadRequest)
+				response.WriteError(w, http.StatusBadRequest, "value_numeric is above maximum")
 				return
 			}
 		}
@@ -451,20 +442,20 @@ func (h *ParameterHandler) SetParameterValue(w http.ResponseWriter, r *http.Requ
 
 	if target.ParameterType == "enum" {
 		if req.ValueEnumID == nil {
-			http.Error(w, "value_enum_id is required for enum parameter", http.StatusBadRequest)
+			response.WriteError(w, http.StatusBadRequest, "value_enum_id is required for enum parameter")
 			return
 		}
 		if req.ValueNumeric != nil {
-			http.Error(w, "value_numeric is not allowed for enum parameter", http.StatusBadRequest)
+			response.WriteError(w, http.StatusBadRequest, "value_numeric is not allowed for enum parameter")
 			return
 		}
 		if target.EnumID == nil {
-			http.Error(w, "Enum is not attached to this parameter", http.StatusBadRequest)
+			response.WriteError(w, http.StatusBadRequest, "Enum is not attached to this parameter")
 			return
 		}
 		values, err := h.EnumRepo.GetEnumValues(ctx, *target.EnumID)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			response.WriteError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 		ok := false
@@ -475,7 +466,7 @@ func (h *ParameterHandler) SetParameterValue(w http.ResponseWriter, r *http.Requ
 			}
 		}
 		if !ok {
-			http.Error(w, "Selected enum value does not belong to this enum", http.StatusBadRequest)
+			response.WriteError(w, http.StatusBadRequest, "Selected enum value does not belong to this enum")
 			return
 		}
 	}
@@ -488,12 +479,10 @@ func (h *ParameterHandler) SetParameterValue(w http.ResponseWriter, r *http.Requ
 	}
 	pv, err := h.ParamRepo.SetParameterValue(ctx, createReq)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(pv)
+	response.WriteJSON(w, http.StatusOK, pv)
 }
 
 func (h *ParameterHandler) GetParameterValuesForProduct(w http.ResponseWriter, r *http.Request) {
@@ -501,18 +490,17 @@ func (h *ParameterHandler) GetParameterValuesForProduct(w http.ResponseWriter, r
 	productIDStr := vars["product_id"]
 	productID, err := strconv.Atoi(productIDStr)
 	if err != nil {
-		http.Error(w, "Invalid product_id", http.StatusBadRequest)
+		response.WriteError(w, http.StatusBadRequest, "Invalid product_id")
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := response.RequestContext(r)
 	defer cancel()
 	values, err := h.ParamRepo.GetParameterValuesForProduct(ctx, productID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(values)
+	response.WriteJSON(w, http.StatusOK, values)
 }
 
 func (h *ParameterHandler) UpdateParameterValue(w http.ResponseWriter, r *http.Request) {
@@ -520,20 +508,20 @@ func (h *ParameterHandler) UpdateParameterValue(w http.ResponseWriter, r *http.R
 	idStr := vars["id"]
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, "Invalid id", http.StatusBadRequest)
+		response.WriteError(w, http.StatusBadRequest, "Invalid id")
 		return
 	}
 	var req UpdateParameterValueRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+	if err := response.ReadJSON(r, &req); err != nil {
+		response.WriteError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 	if req.ValueNumeric == nil && req.ValueEnumID == nil {
-		http.Error(w, "value is required", http.StatusBadRequest)
+		response.WriteError(w, http.StatusBadRequest, "value is required")
 		return
 	}
 	if req.ValueNumeric != nil && req.ValueEnumID != nil {
-		http.Error(w, "only one value can be set", http.StatusBadRequest)
+		response.WriteError(w, http.StatusBadRequest, "only one value can be set")
 		return
 	}
 	updateReq := models.UpdateParameterValueRequest{
@@ -541,19 +529,18 @@ func (h *ParameterHandler) UpdateParameterValue(w http.ResponseWriter, r *http.R
 		ValueNumeric: req.ValueNumeric,
 		ValueEnumID:  req.ValueEnumID,
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := response.RequestContext(r)
 	defer cancel()
-	err = h.ParamRepo.UpdateParameterValue(ctx, updateReq)
+	updatedValue, err := h.ParamRepo.UpdateParameterValue(ctx, updateReq)
 	if err != nil {
 		if err == repository.ErrNotFound {
-			http.Error(w, "Parameter value not found", http.StatusNotFound)
+			response.WriteError(w, http.StatusNotFound, "Parameter value not found")
 		} else {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			response.WriteError(w, http.StatusInternalServerError, err.Error())
 		}
 		return
 	}
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	response.WriteJSON(w, http.StatusOK, updatedValue)
 }
 
 func (h *ParameterHandler) DeleteParameterValue(w http.ResponseWriter, r *http.Request) {
@@ -561,22 +548,21 @@ func (h *ParameterHandler) DeleteParameterValue(w http.ResponseWriter, r *http.R
 	idStr := vars["id"]
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, "Invalid id", http.StatusBadRequest)
+		response.WriteError(w, http.StatusBadRequest, "Invalid id")
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := response.RequestContext(r)
 	defer cancel()
 	err = h.ParamRepo.DeleteParameterValue(ctx, id)
 	if err != nil {
 		if err == repository.ErrNotFound {
-			http.Error(w, "Parameter value not found", http.StatusNotFound)
+			response.WriteError(w, http.StatusNotFound, "Parameter value not found")
 		} else {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			response.WriteError(w, http.StatusInternalServerError, err.Error())
 		}
 		return
 	}
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	response.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 func (h *ParameterHandler) FindProductsByParameters(w http.ResponseWriter, r *http.Request) {
@@ -584,42 +570,41 @@ func (h *ParameterHandler) FindProductsByParameters(w http.ResponseWriter, r *ht
 	nodeIDStr := vars["node_id"]
 	nodeID, err := strconv.Atoi(nodeIDStr)
 	if err != nil || nodeID <= 0 {
-		http.Error(w, "Invalid node_id", http.StatusBadRequest)
+		response.WriteError(w, http.StatusBadRequest, "Invalid node_id")
 		return
 	}
 
 	var req FindProductsByParametersRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+	if err := response.ReadJSON(r, &req); err != nil {
+		response.WriteError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
 	for i, filter := range req.Filters {
 		if filter.ParamDefID <= 0 {
-			http.Error(w, fmt.Sprintf("filters[%d].param_def_id must be greater than zero", i), http.StatusBadRequest)
+			response.WriteError(w, http.StatusBadRequest, fmt.Sprintf("filters[%d].param_def_id must be greater than zero", i))
 			return
 		}
 		switch filter.Operator {
 		case "=", "<", ">", "<=", ">=":
 		default:
-			http.Error(w, fmt.Sprintf("filters[%d].operator is not supported", i), http.StatusBadRequest)
+			response.WriteError(w, http.StatusBadRequest, fmt.Sprintf("filters[%d].operator is not supported", i))
 			return
 		}
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := response.RequestContext(r)
 	defer cancel()
 
 	products, err := h.ParamRepo.FindProductsByParameters(ctx, nodeID, req.Filters)
 	if err != nil {
 		if err == repository.ErrNotFound {
-			http.Error(w, "Class node not found", http.StatusNotFound)
+			response.WriteError(w, http.StatusNotFound, "No products found matching the criteria")
 			return
 		}
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		response.WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(products)
+	response.WriteJSON(w, http.StatusOK, products)
 }

@@ -73,23 +73,24 @@ func (r *PostgresRepository) GetProduct(ctx context.Context, id int) (*models.Pr
 	return &product, nil
 }
 
-func (r *PostgresRepository) UpdateProduct(ctx context.Context, req models.UpdateProductRequest) error {
+func (r *PostgresRepository) UpdateProduct(ctx context.Context, req models.UpdateProductRequest) (*models.Product, error) {
 	var exists bool
+	var product models.Product
 	err := r.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM products WHERE id = $1)`, req.ID).Scan(&exists)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if !exists {
-		return ErrNotFound
+		return nil, ErrNotFound
 	}
 	if req.ClassNodeID != 0 {
 		var classExists bool
 		err = r.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM classifier_nodes WHERE id = $1)`, req.ClassNodeID).Scan(&classExists)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if !classExists {
-			return ErrNotFound
+			return nil, ErrNotFound
 		}
 	}
 
@@ -98,8 +99,9 @@ func (r *PostgresRepository) UpdateProduct(ctx context.Context, req models.Updat
 		SET name = $1, class_node_id = $2, unit_type = $3, weight_per_meter = $4,
 		    piece_length = $5, default_unit_id = $6, updated_at = now()
 		WHERE id = $7
+		RETURNING id, name, class_node_id, unit_type, weight_per_meter, piece_length, default_unit_id, created_at, updated_at
 	`
-	_, err = r.db.ExecContext(ctx, query,
+	err = r.db.QueryRowContext(ctx, query,
 		req.Name,
 		req.ClassNodeID,
 		req.UnitType,
@@ -107,8 +109,21 @@ func (r *PostgresRepository) UpdateProduct(ctx context.Context, req models.Updat
 		req.PieceLength,
 		req.DefaultUnitID,
 		req.ID,
+	).Scan(
+		&product.ID,
+		&product.Name,
+		&product.ClassNodeID,
+		&product.UnitType,
+		&product.WeightPerMeter,
+		&product.PieceLength,
+		&product.DefaultUnitID,
+		&product.CreatedAt,
+		&product.UpdatedAt,
 	)
-	return err
+	if err != nil {
+		return nil, err
+	}
+	return &product, nil
 }
 
 func (r *PostgresRepository) DeleteProduct(ctx context.Context, id int) error {

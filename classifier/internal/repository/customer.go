@@ -84,23 +84,27 @@ func (r *PostgresRepository) GetAllCustomers(ctx context.Context) ([]*models.Cus
 	return customers, rows.Err()
 }
 
-func (r *PostgresRepository) UpdateCustomer(ctx context.Context, req models.UpdateCustomerRequest) error {
+func (r *PostgresRepository) UpdateCustomer(ctx context.Context, req models.UpdateCustomerRequest) (*models.Customer, error) {
+	var customer models.Customer
 	query := `
 		UPDATE customers
 		SET name = $1, tax_id = $2, address = $3, updated_at = now()
 		WHERE id = $4
+		RETURNING id, name, tax_id, address, created_at, updated_at
 	`
-	result, err := r.db.ExecContext(ctx, query, req.Name, req.TaxID, req.Address, req.ID)
+	err := r.db.QueryRowContext(ctx, query, req.Name, req.TaxID, req.Address, req.ID).Scan(
+		&customer.ID,
+		&customer.Name,
+		&customer.TaxID,
+		&customer.Address,
+		&customer.CreatedAt,
+		&customer.UpdatedAt,
+	)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	rowsAffected, _ := result.RowsAffected()
-	if rowsAffected == 0 {
-		return ErrNotFound
-	}
-
-	return nil
+	return &customer, nil
 }
 
 func (r *PostgresRepository) DeleteCustomer(ctx context.Context, id int) error {

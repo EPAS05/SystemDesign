@@ -136,7 +136,7 @@ func (h *CustomerHandler) UpdateCustomer(w http.ResponseWriter, r *http.Request)
 		address = req.Address
 	}
 
-	err = h.Repo.UpdateCustomer(ctx, models.UpdateCustomerRequest{
+	customer, err := h.Repo.UpdateCustomer(ctx, models.UpdateCustomerRequest{
 		ID:      id,
 		Name:    name,
 		TaxID:   taxID,
@@ -151,7 +151,7 @@ func (h *CustomerHandler) UpdateCustomer(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	response.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	response.WriteJSON(w, http.StatusOK, customer)
 }
 
 func (h *CustomerHandler) DeleteCustomer(w http.ResponseWriter, r *http.Request) {

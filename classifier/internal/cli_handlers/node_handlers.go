@@ -259,12 +259,12 @@ func moveNode(repo repository.Repository, reader *bufio.Reader) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	err := repo.SetParent(ctx, req)
+	updatedNode, err := repo.SetParent(ctx, req)
 	if err != nil {
 		fmt.Printf("Ошибка: %v\n", err)
 		return
 	}
-	fmt.Println("Узел перемещён.")
+	fmt.Printf("Узел перемещён: %d - %s\n", updatedNode.ID, updatedNode.Name)
 }
 
 func renameNode(repo repository.Repository, reader *bufio.Reader) {
@@ -280,12 +280,12 @@ func renameNode(repo repository.Repository, reader *bufio.Reader) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	err := repo.SetName(ctx, req)
+	updatedNode, err := repo.SetName(ctx, req)
 	if err != nil {
 		fmt.Printf("Ошибка: %v\n", err)
 		return
 	}
-	fmt.Println("Узел переименован.")
+	fmt.Printf("Узел переименован: %d - %s\n", updatedNode.ID, updatedNode.Name)
 }
 
 func setNodeOrder(repo repository.Repository, reader *bufio.Reader) {

@@ -194,7 +194,7 @@ func updateCustomer(repo repository.Repository, reader *bufio.Reader) {
 		address = &addressInput
 	}
 
-	err = repo.UpdateCustomer(ctx, models.UpdateCustomerRequest{
+	customer, err := repo.UpdateCustomer(ctx, models.UpdateCustomerRequest{
 		ID:      id,
 		Name:    name,
 		TaxID:   taxID,
@@ -209,7 +209,7 @@ func updateCustomer(repo repository.Repository, reader *bufio.Reader) {
 		return
 	}
 
-	fmt.Println("Заказчик обновлён.")
+	fmt.Printf("Заказчик обновлён. ID=%d, Name=%s\n", customer.ID, customer.Name)
 }
 
 func deleteCustomer(repo repository.Repository, reader *bufio.Reader) {

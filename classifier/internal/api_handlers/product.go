@@ -150,7 +150,7 @@ func (h *ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := response.RequestContext(r)
 	defer cancel()
-	err = h.Repo.UpdateProduct(ctx, updateReq)
+	product, err := h.Repo.UpdateProduct(ctx, updateReq)
 	if err != nil {
 		if err == repository.ErrNotFound {
 			response.WriteError(w, http.StatusNotFound, "Product not found")
@@ -159,7 +159,7 @@ func (h *ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	response.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	response.WriteJSON(w, http.StatusOK, product)
 }
 
 func (h *ProductHandler) DeleteProduct(w http.ResponseWriter, r *http.Request) {

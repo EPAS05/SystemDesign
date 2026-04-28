@@ -371,12 +371,12 @@ func updateParameterDefinition(repo repository.Repository, reader *bufio.Reader)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	err = repo.UpdateParameterDefinition(ctx, req)
+	updatedParam, err := repo.UpdateParameterDefinition(ctx, req)
 	if err != nil {
 		fmt.Printf("Ошибка обновления: %v\n", err)
 		return
 	}
-	fmt.Println("Параметр обновлён.")
+	fmt.Printf("Параметр обновлён: %d - %s\n", updatedParam.ID, updatedParam.Name)
 }
 
 func deleteParameterDefinition(repo repository.Repository, reader *bufio.Reader) {

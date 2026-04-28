@@ -149,10 +149,10 @@ func (r *PostgresRepository) GetParameterDefinitionsForClass(ctx context.Context
 	return params, rows.Err()
 }
 
-func (r *PostgresRepository) UpdateParameterDefinition(ctx context.Context, req models.UpdateParameterDefinitionRequest) error {
+func (r *PostgresRepository) UpdateParameterDefinition(ctx context.Context, req models.UpdateParameterDefinitionRequest) (*models.ParameterDefinition, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer tx.Rollback()
 
@@ -160,29 +160,37 @@ func (r *PostgresRepository) UpdateParameterDefinition(ctx context.Context, req 
         UPDATE parameter_definitions
         SET name = $1, description = $2, unit_id = $3, enum_id = $4, is_required = $5, sort_order = $6, updated_at = now()
         WHERE id = $7
+		RETURNING id, class_node_id, name, description, parameter_type, unit_id, enum_id, is_required, sort_order, created_at, updated_at
     `
-	result, err := tx.ExecContext(ctx, query, req.Name, req.Description, req.UnitID, req.EnumID, req.IsRequired, req.SortOrder, req.ID)
-	if err != nil {
-		return err
+	var param models.ParameterDefinition
+	err = tx.QueryRowContext(ctx, query, req.Name, req.Description, req.UnitID, req.EnumID, req.IsRequired, req.SortOrder, req.ID).Scan(
+		&param.ID, &param.ClassNodeID, &param.Name, &param.Description, &param.ParameterType,
+		&param.UnitID, &param.EnumID, &param.IsRequired, &param.SortOrder,
+		&param.CreatedAt, &param.UpdatedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
 	}
-	rows, _ := result.RowsAffected()
-	if rows == 0 {
-		return ErrNotFound
+	if err != nil {
+		return nil, err
 	}
 
 	if req.Constraints != nil {
 		_, err = tx.ExecContext(ctx, `DELETE FROM parameter_constraints WHERE param_def_id = $1`, req.ID)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		_, err = tx.ExecContext(ctx, `INSERT INTO parameter_constraints (param_def_id, min_value, max_value) VALUES ($1, $2, $3)`,
 			req.ID, req.Constraints.MinValue, req.Constraints.MaxValue)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	return tx.Commit()
+	if err = tx.Commit(); err != nil {
+		return nil, err
+	}
+	return &param, nil
 }
 
 func (r *PostgresRepository) DeleteParameterDefinition(ctx context.Context, id int) error {
@@ -288,20 +296,30 @@ func (r *PostgresRepository) GetParameterValuesForProduct(ctx context.Context, p
 	return values, rows.Err()
 }
 
-func (r *PostgresRepository) UpdateParameterValue(ctx context.Context, req models.UpdateParameterValueRequest) error {
-	result, err := r.db.ExecContext(ctx, `
+func (r *PostgresRepository) UpdateParameterValue(ctx context.Context, req models.UpdateParameterValueRequest) (*models.ParameterValue, error) {
+	query := `
         UPDATE parameter_values
         SET value_numeric = $1, value_enum_id = $2, updated_at = now()
         WHERE id = $3
-    `, req.ValueNumeric, req.ValueEnumID, req.ID)
+		RETURNING id, product_id, param_def_id, value_numeric, value_enum_id, created_at, updated_at
+    `
+	var pv models.ParameterValue
+	err := r.db.QueryRowContext(ctx, query, req.ValueNumeric, req.ValueEnumID, req.ID).Scan(
+		&pv.ID,
+		&pv.ProductID,
+		&pv.ParamDefID,
+		&pv.ValueNumeric,
+		&pv.ValueEnumID,
+		&pv.CreatedAt,
+		&pv.UpdatedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
 	if err != nil {
-		return err
+		return nil, err
 	}
-	rows, _ := result.RowsAffected()
-	if rows == 0 {
-		return ErrNotFound
-	}
-	return nil
+	return &pv, nil
 }
 
 func (r *PostgresRepository) DeleteParameterValue(ctx context.Context, id int) error {

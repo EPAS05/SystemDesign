@@ -7,7 +7,6 @@ import (
 	"fmt"
 )
 
-// TODO: in get ancessors descendors add products
 const trashNodeID = 1
 
 func (r *PostgresRepository) CreateNode(ctx context.Context, req models.CreateNodeRequest) (*models.Node, error) {
@@ -262,54 +261,84 @@ func (r *PostgresRepository) GetParent(ctx context.Context, id int) (*models.Nod
 	return r.getNodeByID(ctx, *node.ParentID)
 }
 
-func (r *PostgresRepository) SetParent(ctx context.Context, req models.SetParentRequest) error {
+func (r *PostgresRepository) SetParent(ctx context.Context, req models.SetParentRequest) (*models.Node, error) {
 	node, err := r.getNodeByID(ctx, req.NodeId)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if (node.ParentID == nil && req.NewParentID == nil) ||
 		(node.ParentID != nil && req.NewParentID != nil && *node.ParentID == *req.NewParentID) {
-		return nil
+		return node, nil
 	}
 
 	if req.NewParentID != nil {
 		parent, err := r.getNodeByID(ctx, *req.NewParentID)
 		if err != nil {
-			return ErrNotFound
+			return nil, ErrNotFound
 		}
 		if err := r.checkChildCompatibility(parent); err != nil {
-			return err
+			return nil, err
 		}
 		if err := r.checkCycle(ctx, node.ID, *req.NewParentID); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
 	query := `
 		UPDATE classifier_nodes 
 		SET parent_id = $1, updated_at = now() 
-		WHERE id = $2;
+		WHERE id = $2
+		RETURNING id, name, parent_id, is_terminal, unit_id, sort_order, created_at, updated_at
 	`
-	_, err = r.db.ExecContext(ctx, query, req.NewParentID, req.NodeId)
-	return err
+
+	var updatedNode models.Node
+	err = r.db.QueryRowContext(ctx, query, req.NewParentID, req.NodeId).Scan(
+		&updatedNode.ID,
+		&updatedNode.Name,
+		&updatedNode.ParentID,
+		&updatedNode.IsTerminal,
+		&updatedNode.UnitID,
+		&updatedNode.SortOrder,
+		&updatedNode.CreatedAt,
+		&updatedNode.UpdatedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &updatedNode, nil
 }
 
-func (r *PostgresRepository) SetName(ctx context.Context, req models.SetNameRequest) error {
+func (r *PostgresRepository) SetName(ctx context.Context, req models.SetNameRequest) (*models.Node, error) {
 	query := `
 		UPDATE classifier_nodes 
 		SET name = $1, updated_at = now() 
-		WHERE id = $2;
+		WHERE id = $2
+		RETURNING id, name, parent_id, is_terminal, unit_id, sort_order, created_at, updated_at
 	`
-	result, err := r.db.ExecContext(ctx, query, req.Name, req.NodeId)
+
+	var result models.Node
+
+	err := r.db.QueryRowContext(ctx, query, req.Name, req.NodeId).Scan(
+		&result.ID,
+		&result.Name,
+		&result.ParentID,
+		&result.IsTerminal,
+		&result.UnitID,
+		&result.SortOrder,
+		&result.CreatedAt,
+		&result.UpdatedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
 	if err != nil {
-		return err
+		return nil, err
 	}
-	rows, _ := result.RowsAffected()
-	if rows == 0 {
-		return ErrNotFound
-	}
-	return nil
+	return &result, nil
 }
 
 func (r *PostgresRepository) SetNodeOrder(ctx context.Context, nodeID int, order int) error {

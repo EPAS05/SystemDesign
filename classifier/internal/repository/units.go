@@ -81,21 +81,28 @@ func (r *PostgresRepository) GetAllUnits(ctx context.Context) ([]*models.Unit, e
 	return units, rows.Err()
 }
 
-func (r *PostgresRepository) UpdateUnit(ctx context.Context, req models.UpdateUnitRequest) error {
+func (r *PostgresRepository) UpdateUnit(ctx context.Context, req models.UpdateUnitRequest) (*models.Unit, error) {
+	var unit models.Unit
 	query := `
 		UPDATE units 
 		SET name = $1, multiplier = $2, updated_at = now() 
-		WHERE id = $3;
+		WHERE id = $3
+		RETURNING id, name, multiplier, created_at, updated_at;
 	`
-	result, err := r.db.ExecContext(ctx, query, req.Name, req.Multiplier, req.ID)
+	err := r.db.QueryRowContext(ctx, query, req.Name, req.Multiplier, req.ID).Scan(
+		&unit.ID,
+		&unit.Name,
+		&unit.Multiplier,
+		&unit.CreatedAt,
+		&unit.UpdatedAt,
+	)
 	if err != nil {
-		return err
+		if err == sql.ErrNoRows {
+			return nil, ErrNotFound
+		}
+		return nil, err
 	}
-	rows, _ := result.RowsAffected()
-	if rows == 0 {
-		return ErrNotFound
-	}
-	return nil
+	return &unit, nil
 }
 
 func (r *PostgresRepository) DeleteUnit(ctx context.Context, id int) error {

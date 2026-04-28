@@ -140,12 +140,12 @@ func updateUnit(repo repository.Repository, reader *bufio.Reader) {
 
 	ctxUpdate, cancelUpdate := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancelUpdate()
-	err = repo.UpdateUnit(ctxUpdate, req)
+	updatedUnit, err := repo.UpdateUnit(ctxUpdate, req)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		return
 	}
-	fmt.Println("ЕИ изменен.")
+	fmt.Printf("ЕИ c id %d изменена\n", updatedUnit.ID)
 }
 
 func deleteUnit(repo repository.Repository, reader *bufio.Reader) {

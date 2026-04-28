@@ -299,12 +299,12 @@ func updateProduct(repo repository.Repository, reader *bufio.Reader) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	err = repo.UpdateProduct(ctx, req)
+	product, err = repo.UpdateProduct(ctx, req)
 	if err != nil {
 		fmt.Printf("Ошибка обновления: %v\n", err)
 		return
 	}
-	fmt.Println("Изделие обновлено.")
+	fmt.Printf("Изделие %d обновлено.\n", product.ID)
 }
 
 func deleteProduct(repo repository.Repository, reader *bufio.Reader) {
