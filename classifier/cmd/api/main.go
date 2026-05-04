@@ -26,7 +26,7 @@ func main() {
 	nodeHandler := &api_handlers.NodeHandler{Repo: repo}
 	unitHandler := &api_handlers.UnitHandler{Repo: repo}
 	enumHandler := &api_handlers.EnumHandler{Repo: repo}
-	productHandler := &api_handlers.ProductHandler{Repo: repo, NodeRepo: repo}
+	productHandler := &api_handlers.ProductHandler{Repo: repo, NodeRepo: repo, UnitRepo: repo}
 	customerHandler := &api_handlers.CustomerHandler{Repo: repo}
 	parameterHandler := &api_handlers.ParameterHandler{
 		ParamRepo:   repo,

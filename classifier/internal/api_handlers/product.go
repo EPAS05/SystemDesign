@@ -4,6 +4,7 @@ import (
 	"classifier/internal/http/response"
 	"classifier/internal/models"
 	"classifier/internal/repository"
+	"context"
 	"net/http"
 	"strconv"
 
@@ -13,6 +14,7 @@ import (
 type ProductHandler struct {
 	Repo     repository.ProductRepository
 	NodeRepo repository.NodeRepository
+	UnitRepo repository.UnitRepository
 }
 
 type CreateProductRequest struct {
@@ -58,6 +60,14 @@ func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 	}
 	if class.IsTerminal != nil && *class.IsTerminal == false {
 		response.WriteError(w, http.StatusBadRequest, "Class is non-terminal, cannot add product")
+		return
+	}
+	if err := h.ensureUnitExists(ctx, req.DefaultUnitID); err != nil {
+		if err == repository.ErrNotFound {
+			response.WriteError(w, http.StatusNotFound, "Unit not found")
+		} else {
+			response.WriteError(w, http.StatusInternalServerError, err.Error())
+		}
 		return
 	}
 
@@ -139,6 +149,16 @@ func (h *ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 		response.WriteError(w, http.StatusBadRequest, "name is required")
 		return
 	}
+	ctx, cancel := response.RequestContext(r)
+	defer cancel()
+	if err := h.ensureUnitExists(ctx, req.DefaultUnitID); err != nil {
+		if err == repository.ErrNotFound {
+			response.WriteError(w, http.StatusNotFound, "Unit not found")
+		} else {
+			response.WriteError(w, http.StatusInternalServerError, err.Error())
+		}
+		return
+	}
 	updateReq := models.UpdateProductRequest{
 		ID:             id,
 		Name:           req.Name,
@@ -148,7 +168,7 @@ func (h *ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 		PieceLength:    req.PieceLength,
 		DefaultUnitID:  req.DefaultUnitID,
 	}
-	ctx, cancel := response.RequestContext(r)
+	ctx, cancel = response.RequestContext(r)
 	defer cancel()
 	product, err := h.Repo.UpdateProduct(ctx, updateReq)
 	if err != nil {
@@ -201,4 +221,15 @@ func (h *ProductHandler) DeleteProduct(w http.ResponseWriter, r *http.Request) {
 
 func boolPtr(b bool) *bool {
 	return &b
+}
+
+func (h *ProductHandler) ensureUnitExists(ctx context.Context, unitID *int) error {
+	if unitID == nil {
+		return nil
+	}
+	_, err := h.UnitRepo.GetUnit(ctx, *unitID)
+	if err != nil {
+		return err
+	}
+	return nil
 }

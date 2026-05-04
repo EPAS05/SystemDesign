@@ -22,3 +22,13 @@ type UpdateUnitRequest struct {
 	Name       string
 	Multiplier float64
 }
+
+type SetUnitRequest struct {
+	NodeId int
+	UnitID *int
+}
+
+type SetDefaultUnitRequest struct {
+	ProductID int
+	UnitID    *int
+}

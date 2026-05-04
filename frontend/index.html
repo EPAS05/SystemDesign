@@ -1,257 +1,82 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Classifier MVP</title>
-  <style>
-    :root {
-      --bg: #f2efe8;
-      --panel: #ffffff;
-      --text: #1e293b;
-      --muted: #64748b;
-      --accent: #0f766e;
-      --border: #e2e8f0;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      margin: 0;
-      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-      color: var(--text);
-      background:
-        radial-gradient(circle at 20% 0%, #d1fae5 0%, rgba(209, 250, 229, 0) 45%),
-        radial-gradient(circle at 100% 100%, #e0f2fe 0%, rgba(224, 242, 254, 0) 40%),
-        var(--bg);
-      min-height: 100vh;
-      padding: 24px;
-    }
-
-    .container {
-      max-width: 1100px;
-      margin: 0 auto;
-      display: grid;
-      gap: 16px;
-    }
-
-    .panel {
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 16px;
-      box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
-    }
-
-    h1 {
-      margin: 0;
-      font-size: 28px;
-    }
-
-    h2 {
-      margin-top: 0;
-      font-size: 20px;
-    }
-
-    p {
-      margin: 6px 0;
-      color: var(--muted);
-    }
-
-    .badge {
-      display: inline-block;
-      padding: 4px 10px;
-      border-radius: 999px;
-      background: #ccfbf1;
-      color: #115e59;
-      font-weight: 600;
-      font-size: 12px;
-      letter-spacing: 0.02em;
-    }
-
-    ul {
-      margin: 8px 0 0;
-      padding-left: 18px;
-    }
-
-    li {
-      margin: 6px 0;
-    }
-
-    .products-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 12px;
-    }
-
-    .product-card {
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 12px;
-      background: #fcfffe;
-    }
-
-    .product-card h3 {
-      margin: 0 0 8px;
-      font-size: 16px;
-    }
-
-    .muted {
-      color: var(--muted);
-      font-size: 14px;
-    }
-
-    .error {
-      color: #b91c1c;
-      font-weight: 600;
-    }
-
-    .loading {
-      color: var(--accent);
-      font-weight: 600;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SoprotmatRU</title>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <main class="container">
-    <section class="panel">
-      <h1>Classifier MVP</h1>
-      <p>Корневой узел: <strong>2</strong></p>
-      <p>API идет через nginx proxy: <code>/api</code></p>
-      <span class="badge" id="status">Загрузка...</span>
-    </section>
+<div class="app">
+    <div class="tabs">
+        <button class="tab-btn active" data-tab="navigator">Главная</button>
+        <button class="tab-btn" data-tab="products">Продукты</button>
+        <button class="tab-btn" data-tab="enums">Перечисления</button>
+        <button class="tab-btn" data-tab="units">Единицы измерения</button>
+    </div>
 
-    <section class="panel">
-      <h2>Все потомки узла 2</h2>
-      <div id="descendants" class="loading">Загрузка descendants...</div>
-    </section>
+    <div id="navigatorTab" class="tab-content active">
+        <div class="navigator-layout">
+            <div class="navigator-panel">
+                <h2>SoprotmatRU</h2>
+                <div id="treeContainer">Загрузка</div>
+            </div>
+            <div class="main-panel">
+                <div class="action-bar">
+                    <button id="btnAddChild">Добавить узел</button>
+                    <button id="btnEditUnits">Редактировать ЕИ</button>
+                    <button id="btnDeleteNode" class="danger">Удалить</button>
+                    <div class="selected-info" id="selectedInfo">Ничего не выбрано</div>
+                </div>
+                <div id="rightPanel" style="background-color: #ffffff; border-radius: 15px; margin: 16px;">
+                    <h3 id="rightPanelTitle">Выберите категорию слева</h3>
+                    <div id="rightChildrenList">...</div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-    <section class="panel">
-      <h2>Terminal потомки узла 2</h2>
-      <div id="terminals" class="loading">Загрузка terminal-descendants...</div>
-    </section>
+    <div id="productsTab" class="tab-content">
+        <div class="crud-panel">
+            <h2>Продукты</h2>
+            <div class="crud-toolbar">
+                <button id="btnCreateProduct">Создать продукт</button>
+                <button id="btnRefreshProducts">Обновить</button>
+            </div>
+            <div id="productsList" class="data-table">Загрузка</div>
+        </div>
+    </div>
 
-    <section class="panel">
-      <h2>Продукты по terminal-узлам</h2>
-      <div id="products" class="loading">Загрузка products...</div>
-    </section>
-  </main>
+    <div id="enumsTab" class="tab-content">
+        <div class="crud-panel">
+            <h2>Перечисления</h2>
+            <div class="crud-toolbar">
+                <button id="btnCreateEnum">Создать перечисление</button>
+                <button id="btnRefreshEnums">Обновить</button>
+            </div>
+            <div id="enumsList" class="data-table">Загрузка</div>
+        </div>
+    </div>
 
-  <script>
-    const ROOT_NODE_ID = 2;
+    <div id="unitsTab" class="tab-content">
+        <div class="crud-panel">
+            <h2>Единицы измерения</h2>
+            <div class="crud-toolbar">
+                <button id="btnCreateUnit">Создать единицу</button>
+                <button id="btnRefreshUnits">Обновить</button>
+            </div>
+            <div id="unitsList" class="data-table">Загрузка</div>
+        </div>
+    </div>
+</div>
 
-    async function fetchJson(path) {
-      const response = await fetch(path);
-      if (!response.ok) {
-        const text = await response.text();
-        throw new Error(`${response.status} ${response.statusText}: ${text}`);
-      }
-      return response.json();
-    }
+<div id="modal" class="modal">
+    <div class="modal-content">
+        <span class="close">&times;</span>
+        <div id="modalBody"></div>
+    </div>
+</div>
 
-    function boolLabel(value) {
-      if (value === true) return "true";
-      if (value === false) return "false";
-      return "null";
-    }
-
-    function renderNodeList(nodes, hostId) {
-      const host = document.getElementById(hostId);
-      if (!Array.isArray(nodes) || nodes.length === 0) {
-        host.innerHTML = '<p class="muted">Пусто.</p>';
-        return;
-      }
-
-      const ul = document.createElement("ul");
-      nodes.forEach((node) => {
-        const li = document.createElement("li");
-        li.textContent = `ID=${node.ID}, Name=${node.Name}, IsTerminal=${boolLabel(node.IsTerminal)}`;
-        ul.appendChild(li);
-      });
-
-      host.innerHTML = "";
-      host.appendChild(ul);
-    }
-
-    function renderProducts(productsByNode) {
-      const host = document.getElementById("products");
-      const nodeIds = Object.keys(productsByNode);
-      if (nodeIds.length === 0) {
-        host.innerHTML = '<p class="muted">Нет terminal-узлов.</p>';
-        return;
-      }
-
-      const grid = document.createElement("div");
-      grid.className = "products-grid";
-
-      nodeIds.forEach((nodeId) => {
-        const products = productsByNode[nodeId];
-        const card = document.createElement("article");
-        card.className = "product-card";
-
-        const title = document.createElement("h3");
-        title.textContent = `Node ${nodeId}`;
-        card.appendChild(title);
-
-        if (!Array.isArray(products) || products.length === 0) {
-          const empty = document.createElement("p");
-          empty.className = "muted";
-          empty.textContent = "Продуктов нет";
-          card.appendChild(empty);
-        } else {
-          const list = document.createElement("ul");
-          products.forEach((product) => {
-            const li = document.createElement("li");
-            li.textContent = `ID=${product.ID}, Name=${product.Name}`;
-            list.appendChild(li);
-          });
-          card.appendChild(list);
-        }
-
-        grid.appendChild(card);
-      });
-
-      host.innerHTML = "";
-      host.appendChild(grid);
-    }
-
-    function setStatus(text, isError) {
-      const status = document.getElementById("status");
-      status.textContent = text;
-      status.style.background = isError ? "#fee2e2" : "#ccfbf1";
-      status.style.color = isError ? "#991b1b" : "#115e59";
-    }
-
-    async function load() {
-      try {
-        const descendants = await fetchJson(`/api/nodes/${ROOT_NODE_ID}/descendants`);
-        renderNodeList(descendants, "descendants");
-
-        const terminalNodes = await fetchJson(`/api/nodes/${ROOT_NODE_ID}/terminal-descendants`);
-        renderNodeList(terminalNodes, "terminals");
-
-        const productsByNode = {};
-        await Promise.all(
-          (Array.isArray(terminalNodes) ? terminalNodes : []).map(async (node) => {
-            const nodeId = node.ID;
-            const products = await fetchJson(`/api/nodes/${nodeId}/products`);
-            productsByNode[nodeId] = products;
-          })
-        );
-
-        renderProducts(productsByNode);
-        setStatus("Готово", false);
-      } catch (error) {
-        document.getElementById("descendants").innerHTML = `<p class="error">${error.message}</p>`;
-        document.getElementById("terminals").innerHTML = `<p class="error">${error.message}</p>`;
-        document.getElementById("products").innerHTML = `<p class="error">${error.message}</p>`;
-        setStatus("Ошибка загрузки", true);
-      }
-    }
-
-    load();
-  </script>
+<script src="app.js"></script>
 </body>
 </html>

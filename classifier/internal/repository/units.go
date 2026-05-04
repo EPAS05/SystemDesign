@@ -105,6 +105,74 @@ func (r *PostgresRepository) UpdateUnit(ctx context.Context, req models.UpdateUn
 	return &unit, nil
 }
 
+func (r *PostgresRepository) SetUnit(ctx context.Context, req models.SetUnitRequest) (*models.Node, error) {
+	if req.UnitID != nil {
+		if _, err := r.GetUnit(ctx, *req.UnitID); err != nil {
+			return nil, err
+		}
+	}
+
+	query := `
+		UPDATE classifier_nodes
+		SET unit_id = $1, updated_at = now()
+		WHERE id = $2
+		RETURNING id, name, parent_id, is_terminal, unit_id, sort_order, created_at, updated_at
+	`
+
+	var result models.Node
+	err := r.db.QueryRowContext(ctx, query, req.UnitID, req.NodeId).Scan(
+		&result.ID,
+		&result.Name,
+		&result.ParentID,
+		&result.IsTerminal,
+		&result.UnitID,
+		&result.SortOrder,
+		&result.CreatedAt,
+		&result.UpdatedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+func (r *PostgresRepository) SetDefaultUnit(ctx context.Context, req models.SetDefaultUnitRequest) (*models.Product, error) {
+	if req.UnitID != nil {
+		if _, err := r.GetUnit(ctx, *req.UnitID); err != nil {
+			return nil, err
+		}
+	}
+
+	var product models.Product
+	query := `
+		UPDATE products
+		SET default_unit_id = $1, updated_at = now()
+		WHERE id = $2
+		RETURNING id, name, class_node_id, unit_type, weight_per_meter, piece_length, default_unit_id, created_at, updated_at
+	`
+	err := r.db.QueryRowContext(ctx, query, req.UnitID, req.ProductID).Scan(
+		&product.ID,
+		&product.Name,
+		&product.ClassNodeID,
+		&product.UnitType,
+		&product.WeightPerMeter,
+		&product.PieceLength,
+		&product.DefaultUnitID,
+		&product.CreatedAt,
+		&product.UpdatedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &product, nil
+}
+
 func (r *PostgresRepository) DeleteUnit(ctx context.Context, id int) error {
 	var count int
 	QueryToCheck := `

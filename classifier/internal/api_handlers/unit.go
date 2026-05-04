@@ -24,6 +24,14 @@ type UpdateUnitRequest struct {
 	Multiplier float64 `json:"multiplier"`
 }
 
+type SetUnitRequest struct {
+	UnitID *int `json:"unit_id,omitempty"`
+}
+
+type SetDefaultUnitRequest struct {
+	UnitID *int `json:"unit_id,omitempty"`
+}
+
 func (h *UnitHandler) CreateUnit(w http.ResponseWriter, r *http.Request) {
 	var req CreateUnitRequest
 	if err := response.ReadJSON(r, &req); err != nil {
@@ -123,6 +131,60 @@ func (h *UnitHandler) UpdateUnit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response.WriteJSON(w, http.StatusOK, unit)
+}
+
+func (h *UnitHandler) SetUnit(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	idStr := vars["id"]
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		response.WriteError(w, http.StatusBadRequest, "Invalid id")
+		return
+	}
+	var req SetUnitRequest
+	if err := response.ReadJSON(r, &req); err != nil {
+		response.WriteError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+	ctx, cancel := response.RequestContext(r)
+	defer cancel()
+	updatedNode, err := h.Repo.SetUnit(ctx, models.SetUnitRequest{NodeId: id, UnitID: req.UnitID})
+	if err != nil {
+		if err == repository.ErrNotFound {
+			response.WriteError(w, http.StatusNotFound, "Node not found")
+		} else {
+			response.WriteError(w, http.StatusInternalServerError, err.Error())
+		}
+		return
+	}
+	response.WriteJSON(w, http.StatusOK, updatedNode)
+}
+
+func (h *UnitHandler) SetDefaultUnit(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	idStr := vars["id"]
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		response.WriteError(w, http.StatusBadRequest, "Invalid id")
+		return
+	}
+	var req SetDefaultUnitRequest
+	if err := response.ReadJSON(r, &req); err != nil {
+		response.WriteError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+	ctx, cancel := response.RequestContext(r)
+	defer cancel()
+	updatedProduct, err := h.Repo.SetDefaultUnit(ctx, models.SetDefaultUnitRequest{ProductID: id, UnitID: req.UnitID})
+	if err != nil {
+		if err == repository.ErrNotFound {
+			response.WriteError(w, http.StatusNotFound, "Product not found")
+		} else {
+			response.WriteError(w, http.StatusInternalServerError, err.Error())
+		}
+		return
+	}
+	response.WriteJSON(w, http.StatusOK, updatedProduct)
 }
 
 func (h *UnitHandler) DeleteUnit(w http.ResponseWriter, r *http.Request) {

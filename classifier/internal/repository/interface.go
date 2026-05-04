@@ -25,6 +25,8 @@ type UnitRepository interface {
 	GetUnit(ctx context.Context, id int) (*models.Unit, error)
 	GetAllUnits(ctx context.Context) ([]*models.Unit, error)
 	UpdateUnit(ctx context.Context, req models.UpdateUnitRequest) (*models.Unit, error)
+	SetUnit(ctx context.Context, req models.SetUnitRequest) (*models.Node, error)
+	SetDefaultUnit(ctx context.Context, req models.SetDefaultUnitRequest) (*models.Product, error)
 	DeleteUnit(ctx context.Context, id int) error
 }
 
