@@ -11,6 +11,7 @@
     <div class="tabs">
         <button class="tab-btn active" data-tab="navigator">Главная</button>
         <button class="tab-btn" data-tab="products">Продукты</button>
+        <button class="tab-btn" data-tab="params">Параметры классов</button>   <!-- новая кнопка -->
         <button class="tab-btn" data-tab="enums">Перечисления</button>
         <button class="tab-btn" data-tab="units">Единицы измерения</button>
     </div>
@@ -44,6 +45,21 @@
                 <button id="btnRefreshProducts">Обновить</button>
             </div>
             <div id="productsList" class="data-table">Загрузка</div>
+        </div>
+    </div>
+
+    <!-- Новая вкладка: Параметры классов -->
+    <div id="paramsTab" class="tab-content">
+        <div class="crud-panel">
+            <h2>Параметры классов</h2>
+            <div class="crud-toolbar">
+                <select id="paramClassSelect" style="width:250px;">
+                    <option value="">-- Выберите класс --</option>
+                </select>
+                <button id="btnCreateParam">Создать параметр</button>
+                <button id="btnRefreshParams">Обновить</button>
+            </div>
+            <div id="paramsList" class="data-table">Загрузка...</div>
         </div>
     </div>
 

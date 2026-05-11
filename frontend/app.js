@@ -3,7 +3,6 @@ const API_BASE = '/api';
 let selectedNodeId = null;
 let currentNodeForChildren = 2;
 
-// ==================== МО
 function showModal(title, formHtml, onSave) {
     const modal = document.getElementById('modal');
     const modalBody = document.getElementById('modalBody');
@@ -12,8 +11,13 @@ function showModal(title, formHtml, onSave) {
     document.querySelector('.close').onclick = () => modal.style.display = 'none';
     window.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; };
     document.getElementById('modalSaveBtn').onclick = async () => {
-        await onSave();
-        modal.style.display = 'none';
+        try {
+            await onSave();
+            modal.style.display = 'none';
+        } catch (error) {
+            console.error('[modal:save] failed', title, error);
+            showInfoModal('Ошибка', error.message);
+        }
     };
 }
 
@@ -72,9 +76,12 @@ async function fetchJSON(url, options = {}) {
     return res.json();
 }
 
-// ==================== Переключение 
+function asList(value) {
+    return Array.isArray(value) ? value : [];
+}
+
 document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
         btn.classList.add('active');
@@ -82,12 +89,16 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
         document.getElementById(tabId + 'Tab').classList.add('active');
         if (tabId === 'navigator') refreshTreeAndRight();
         else if (tabId === 'products') loadProducts();
+        else if (tabId === 'params') {
+            await loadClassSelect();
+            await loadParamsForSelectedClass();
+        }
         else if (tabId === 'enums') loadEnums();
         else if (tabId === 'units') loadUnits();
     });
 });
 
-// ================================================ НАВИГАТОР
+// ================================================ главная
 async function renderTreeNode(node, parentUl, level) {
     const li = document.createElement('li');
     li.className = 'tree-node';
@@ -260,7 +271,7 @@ document.getElementById('btnEditUnits').onclick = async () => {
     }
 };
 
-// ================================================ ПРОДУКТЫ
+// ================================================ продукты
 async function getAvailableClasses() {
     const descendants = await fetchJSON(`${API_BASE}/nodes/2/descendants`);
     let nodes = Array.isArray(descendants) ? [...descendants] : [];
@@ -293,10 +304,10 @@ async function loadProducts() {
                 <td>${p.UnitType || '-'}</td>
                 <td>${p.WeightPerMeter !== undefined && p.WeightPerMeter !== null ? p.WeightPerMeter : '-'}</td>
                 <td>${p.PieceLength !== undefined && p.PieceLength !== null ? p.PieceLength : '-'}</td>
-                <td class="action-cell"><button class="btn-edit" data-id="${p.ID}">Ред</button><button class="btn-delete" data-id="${p.ID}">Удл</button></td>
+                <td class="action-cell" style="text-align: center; vertical-align: middle;"><button class="btn-edit" data-id="${p.ID}">Ред</button><button class="btn-delete" data-id="${p.ID}">Удл</button></td>
             </tr>`;
         }
-        html += '</tbody></table>';
+        html += '</tbody></tr>';
         container.innerHTML = html;
         document.querySelectorAll('.btn-edit').forEach(btn => btn.onclick = () => editProduct(parseInt(btn.dataset.id)));
         document.querySelectorAll('.btn-delete').forEach(btn => btn.onclick = () => deleteProduct(parseInt(btn.dataset.id)));
@@ -383,28 +394,215 @@ document.getElementById('btnCreateProduct').onclick = async () => {
 
 document.getElementById('btnRefreshProducts').onclick = () => loadProducts();
 
-// ================================================ ЕДИНИЦЫ ИЗМЕРЕНИЯ
+// ================================================ Параметры
+async function loadClassSelect() {
+    const select = document.getElementById('paramClassSelect');
+    try {
+        const nodes = await fetchJSON(`${API_BASE}/nodes/2/descendants`);
+        if (!Array.isArray(nodes)) return;
+        select.innerHTML = '<option value="">-- Выберите класс --</option>';
+        nodes.forEach(node => {
+            if (node.ID === 2) return;
+            const option = document.createElement('option');
+            option.value = node.ID;
+            option.textContent = `${node.Name} (ID ${node.ID})`;
+            select.appendChild(option);
+        });
+        if (!select._listenerAdded) {
+            select.addEventListener('change', () => loadParamsForSelectedClass());
+            select._listenerAdded = true;
+        }
+    } catch(e) { console.error(e); }
+}
+
+async function loadParamsForSelectedClass() {
+    const select = document.getElementById('paramClassSelect');
+    const classId = parseInt(select.value);
+    const container = document.getElementById('paramsList');
+    if (!classId) {
+        container.innerHTML = '<div class="empty-message">Выберите класс</div>';
+        return;
+    }
+    container.innerHTML = 'Загрузка...';
+    try {
+        const params = asList(await fetchJSON(`${API_BASE}/nodes/${classId}/parameter-definitions`));
+        if (!params.length) {
+            container.innerHTML = '<div class="empty-message">Для этого класса нет параметров</div>';
+            return;
+        }
+        let html = `<table><thead><tr><th>ID</th><th>Название</th><th>Тип</th><th>Ед. изм. / Enum</th><th>Обязательный</th><th style="text-align:center">Действия</th></tr></thead><tbody>`;
+        for (let p of params) {
+            let unitOrEnum = '';
+            if (p.ParameterType === 'number' && p.UnitID) {
+                try {
+                    const unit = await fetchJSON(`${API_BASE}/units/${p.UnitID}`);
+                    unitOrEnum = unit.Name;
+                } catch(e) { unitOrEnum = `ЕИ ID ${p.UnitID}`; }
+            } else if (p.ParameterType === 'enum' && p.EnumID) {
+                try {
+                    const enumObj = await fetchJSON(`${API_BASE}/enums/${p.EnumID}`);
+                    unitOrEnum = `Перечисление: ${enumObj.Name}`;
+                } catch(e) { unitOrEnum = `Enum ID ${p.EnumID}`; }
+            } else {
+                unitOrEnum = '—';
+            }
+            html += `<tr>
+                <td>${p.ID}</td>
+                <td>${p.Name}</td>
+                <td>${p.ParameterType === 'number' ? 'Числовой' : 'Перечисление'}</td>
+                <td>${unitOrEnum}</td>
+                <td>${p.IsRequired ? 'Да' : 'Нет'}</td>
+                <td class="action-cell" style="text-align: center; vertical-align: middle;">
+                    <button class="btn-edit" data-id="${p.ID}">Ред</button>
+                    <button class="btn-delete" data-id="${p.ID}">Удл</button>
+                </td>
+            </tr>`;
+        }
+        html += '</tbody></table>';
+        container.innerHTML = html;
+        document.querySelectorAll('#paramsList .btn-edit').forEach(btn => btn.onclick = () => editParameter(parseInt(btn.dataset.id)));
+        document.querySelectorAll('#paramsList .btn-delete').forEach(btn => btn.onclick = () => deleteParameter(parseInt(btn.dataset.id)));
+    } catch(e) {
+        container.innerHTML = `<div class="error">Ошибка загрузки: ${e.message}</div>`;
+        console.error(e);
+    }
+}
+
+const loadParamsBtn = document.getElementById('btnLoadParams');
+if (loadParamsBtn) {
+    loadParamsBtn.onclick = () => loadParamsForSelectedClass();
+}
+document.getElementById('btnRefreshParams').onclick = async () => {
+    await loadClassSelect();
+    loadParamsForSelectedClass();
+};
+
+document.getElementById('btnCreateParam').onclick = async () => {
+    const classId = parseInt(document.getElementById('paramClassSelect').value);
+    if (!classId) {
+        showInfoModal('Ошибка', 'Сначала выберите класс');
+        return;
+    }
+    console.info('[params:create] loading units and enums for selector', { classId });
+    const units = asList(await fetchJSON(`${API_BASE}/units`));
+    const enums = asList(await fetchJSON(`${API_BASE}/enums`));
+    console.debug('[params:create] loaded lists', { unitsCount: units.length, enumsCount: enums.length });
+    const unitOptions = units.map(u => `<option value="${u.ID}">${u.Name}</option>`).join('');
+    const enumOptions = enums.map(e => `<option value="${e.ID}">${e.Name}</option>`).join('');
+    const form = `
+        <div class="form-group"><label>Название</label><input id="paramName" autofocus></div>
+        <div class="form-group"><label>Тип</label>
+            <select id="paramType">
+                <option value="number">Числовой</option>
+                <option value="enum">Перечисление</option>
+            </select>
+        </div>
+        <div class="form-group" id="unitGroup"><label>Единица измерения</label><select id="paramUnit">${unitOptions}</select></div>
+        <div class="form-group" id="enumGroup" style="display:none;"><label>Перечисление</label><select id="paramEnum">${enumOptions}</select></div>
+        <div class="form-group"><label>Обязательный</label><input type="checkbox" id="paramRequired"></div>
+        <div class="form-group"><label>Порядок (число)</label><input id="paramOrder" type="number"></div>
+    `;
+    showModal('Создать параметр', form, async () => {
+        const name = document.getElementById('paramName').value.trim();
+        if (!name) { showInfoModal('Ошибка', 'Название обязательно'); return; }
+        const type = document.getElementById('paramType').value;
+        const isRequired = document.getElementById('paramRequired').checked;
+        const sortOrder = document.getElementById('paramOrder').value ? parseInt(document.getElementById('paramOrder').value) : null;
+        let body = { name, parameter_type: type, is_required: isRequired, sort_order: sortOrder };
+        if (type === 'number') {
+            const unitId = document.getElementById('paramUnit').value;
+            if (unitId) body.unit_id = parseInt(unitId);
+        } else {
+            const enumId = document.getElementById('paramEnum').value;
+            if (enumId) body.enum_id = parseInt(enumId);
+        }
+        await fetchJSON(`${API_BASE}/nodes/${classId}/parameter-definitions`, { method: 'POST', body: JSON.stringify(body) });
+        showInfoModal('Успех', 'Параметр создан');
+        loadParamsForSelectedClass();
+    });
+    document.getElementById('paramType').addEventListener('change', (e) => {
+        const isNumber = e.target.value === 'number';
+        document.getElementById('unitGroup').style.display = isNumber ? 'block' : 'none';
+        document.getElementById('enumGroup').style.display = isNumber ? 'none' : 'block';
+    });
+};
+
+async function editParameter(paramId) {
+    const param = await fetchJSON(`${API_BASE}/parameter-definitions/${paramId}`);
+    const units = asList(await fetchJSON(`${API_BASE}/units`));
+    const enums = asList(await fetchJSON(`${API_BASE}/enums`));
+    const unitOptions = units.map(u => `<option value="${u.ID}" ${param.UnitID === u.ID ? 'selected' : ''}>${u.Name}</option>`).join('');
+    const enumOptions = enums.map(e => `<option value="${e.ID}" ${param.EnumID === e.ID ? 'selected' : ''}>${e.Name}</option>`).join('');
+    const form = `
+        <div class="form-group"><label>Название</label><input id="paramName" value="${param.Name}"></div>
+        <div class="form-group"><label>Тип</label>
+            <select id="paramType" disabled>
+                <option value="number" ${param.ParameterType === 'number' ? 'selected' : ''}>Числовой</option>
+                <option value="enum" ${param.ParameterType === 'enum' ? 'selected' : ''}>Перечисление</option>
+            </select>
+        </div>
+        <div class="form-group" id="unitGroup" style="${param.ParameterType === 'number' ? 'block' : 'none'}"><label>Единица измерения</label><select id="paramUnit">${unitOptions}</select></div>
+        <div class="form-group" id="enumGroup" style="${param.ParameterType === 'enum' ? 'block' : 'none'}"><label>Перечисление</label><select id="paramEnum">${enumOptions}</select></div>
+        <div class="form-group"><label>Обязательный</label><input type="checkbox" id="paramRequired" ${param.IsRequired ? 'checked' : ''}></div>
+        <div class="form-group"><label>Порядок (число)</label><input id="paramOrder" type="number" value="${param.SortOrder}"></div>
+    `;
+    showModal('Редактировать параметр', form, async () => {
+        const name = document.getElementById('paramName').value.trim();
+        if (!name) { showInfoModal('Ошибка', 'Название обязательно'); return; }
+        const isRequired = document.getElementById('paramRequired').checked;
+        const sortOrder = parseInt(document.getElementById('paramOrder').value);
+        let body = { name, is_required: isRequired, sort_order: sortOrder };
+        if (param.ParameterType === 'number') {
+            const unitId = document.getElementById('paramUnit').value;
+            if (unitId) body.unit_id = parseInt(unitId);
+        } else {
+            const enumId = document.getElementById('paramEnum').value;
+            if (enumId) body.enum_id = parseInt(enumId);
+        }
+        await fetchJSON(`${API_BASE}/parameter-definitions/${paramId}`, { method: 'PUT', body: JSON.stringify(body) });
+        showInfoModal('Успех', 'Параметр обновлён');
+        loadParamsForSelectedClass();
+    });
+}
+
+async function deleteParameter(paramId) {
+    showConfirmModal('Подтверждение удаления', 'Удалить параметр? Это повлияет на все продукты этого класса.', async () => {
+        await fetchJSON(`${API_BASE}/parameter-definitions/${paramId}`, { method: 'DELETE' });
+        showInfoModal('Успех', 'Параметр удалён');
+        loadParamsForSelectedClass();
+    });
+}
+
+// ================================================ ЕИ
 async function loadUnits() {
     const container = document.getElementById('unitsList');
     container.innerHTML = 'Загрузка...';
     try {
         let units = await fetchJSON(`${API_BASE}/units`);
         if (!Array.isArray(units)) units = [];
-        if (!units.length) { container.innerHTML = '<div class="empty-message">Нет единиц</div>'; return; }
-        let html = `<tr><thead><tr><th>ID</th><th>Название</th><th>Множитель</th><th style="text-align:center">Действия</th></tr></thead><tbody>`;
+        if (!units.length) {
+            container.innerHTML = '<div class="empty-message">Нет единиц</div>';
+            return;
+        }
+        let html = `<table><thead><tr><th>ID</th><th>Название</th><th>Множитель</th><th style="text-align:center">Действия</th></tr></thead><tbody>`;
         for (let u of units) {
-            html += `<table>
+            html += `<tr>
                 <td>${u.ID}</td>
                 <td>${u.Name}</td>
                 <td>${u.Multiplier}</td>
-                <td class="action-cell"><button class="btn-edit" data-id="${u.ID}">Ред</button><button class="btn-delete" data-id="${u.ID}">Удл</button></td>
+                <td class="action-cell" style="text-align: center; vertical-align: middle;">
+                    <button class="btn-edit" data-id="${u.ID}">Ред</button>
+                    <button class="btn-delete" data-id="${u.ID}">Удл</button>
+                </td>
             </tr>`;
         }
-        html += '</tbody></td>';
+        html += '</tbody></table>';
         container.innerHTML = html;
         document.querySelectorAll('.btn-edit').forEach(btn => btn.onclick = () => editUnit(parseInt(btn.dataset.id)));
         document.querySelectorAll('.btn-delete').forEach(btn => btn.onclick = () => deleteUnit(parseInt(btn.dataset.id)));
-    } catch (e) { container.innerHTML = `<div class="error">${e.message}</div>`; }
+    } catch (e) {
+        container.innerHTML = `<div class="error">${e.message}</div>`;
+    }
 }
 
 async function editUnit(id) {
@@ -440,20 +638,29 @@ document.getElementById('btnCreateUnit').onclick = () => {
             name: document.getElementById('unitName').value,
             multiplier: parseFloat(document.getElementById('unitMult').value)
         };
-        await fetchJSON(`${API_BASE}/units`, { method: 'POST', body: JSON.stringify(body) });
-        loadUnits();
+        console.info('[unit:create] submit', body);
+        if (!body.name) {
+            throw new Error('Название обязательно');
+        }
+        if (!Number.isFinite(body.multiplier) || body.multiplier <= 0) {
+            throw new Error('Множитель должен быть положительным числом');
+        }
+        const createdUnit = await fetchJSON(`${API_BASE}/units`, { method: 'POST', body: JSON.stringify(body) });
+        console.info('[unit:create] success', createdUnit);
+        await loadUnits();
     });
 };
 
 document.getElementById('btnRefreshUnits').onclick = () => loadUnits();
 
-// ================================================ ПЕРЕЧИСЛЕНИЯ
+// ================================================ перечисление
 async function loadEnums() {
     const container = document.getElementById('enumsList');
     container.innerHTML = 'Загрузка...';
     try {
-        let enums = await fetchJSON(`${API_BASE}/enums`);
-        if (!Array.isArray(enums)) enums = [];
+        console.info('[enum:list] loading enums');
+        const enums = asList(await fetchJSON(`${API_BASE}/enums`));
+        console.debug('[enum:list] loaded enums', { count: enums.length });
         if (!enums.length) {
             container.innerHTML = '<div class="empty-message">Нет перечислений</div>';
             return;
@@ -461,7 +668,7 @@ async function loadEnums() {
         let html = `<table><thead><tr><th>ID</th><th>Название</th><th>Тип</th><th>Значения</th><th style="text-align:center">Действия</th></tr></thead><tbody>`;
         for (let e of enums) {
             let values = [];
-            try { values = await fetchJSON(`${API_BASE}/enums/${e.ID}/values`); } catch (e) { values = []; }
+            try { values = asList(await fetchJSON(`${API_BASE}/enums/${e.ID}/values`)); } catch (error) { values = []; }
             const allValues = values.map(v => v.Value).join(', ');
             html += `<tr>
                 <td>${e.ID}</td>
@@ -512,7 +719,7 @@ async function deleteEnum(id) {
 
 async function manageEnumValues(enumId) {
     let values = [];
-    try { values = await fetchJSON(`${API_BASE}/enums/${enumId}/values`); } catch (e) { values = []; }
+    try { values = asList(await fetchJSON(`${API_BASE}/enums/${enumId}/values`)); } catch (e) { values = []; }
     let listHtml = '<ul style="list-style:none; padding:0;">';
     for (let v of values) {
         listHtml += `<li style="display:flex; justify-content:space-between; margin-bottom:8px;">
@@ -623,11 +830,19 @@ document.getElementById('btnCreateEnum').onclick = () => {
             showInfoModal('Ошибка', 'Название обязательно');
             return;
         }
-        await fetchJSON(`${API_BASE}/enums`, { method: 'POST', body: JSON.stringify(body) });
-        loadEnums();
+        console.info('[enum:create] submit', body);
+        try {
+            const createdEnum = await fetchJSON(`${API_BASE}/enums`, { method: 'POST', body: JSON.stringify(body) });
+            console.info('[enum:create] success', createdEnum);
+            await loadEnums();
+        } catch (error) {
+            console.error('[enum:create] failed', error, body);
+            showInfoModal('Ошибка', error.message);
+        }
     });
 };
 document.getElementById('btnRefreshEnums').onclick = () => loadEnums();
+
 
 async function init() {
     await refreshTree();
@@ -635,5 +850,6 @@ async function init() {
     loadProducts();
     loadEnums();
     loadUnits();
+    renderParamsTable();
 }
 init();
